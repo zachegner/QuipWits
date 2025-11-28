@@ -462,7 +462,7 @@ function autoSubmitMissingLastLashAnswers(room) {
         answer: '[No answer]',
         points: 0
       });
-    });
+    }
   });
 }
 
