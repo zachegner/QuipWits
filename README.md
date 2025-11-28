@@ -157,3 +157,13 @@ PORT=3000
 Questions or issues? Check the terminal output for error messages.
 
 Made for friends who appreciate adult humor! 🎭
+
+---
+
+## ⚖️ Disclaimer
+
+QuipWits is an independent, fan-made project and is **not affiliated with, endorsed by, or connected to Jackbox Games, Inc.** in any way. This is a free, open-source project created for educational and entertainment purposes.
+
+Quiplash® is a registered trademark of Jackbox Games, Inc. All rights belong to their respective owners.
+
+If you enjoy party games like this, please support the original developers by purchasing [Jackbox Party Packs](https://www.jackboxgames.com/).
