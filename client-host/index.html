@@ -13,6 +13,13 @@
   <div class="scanlines"></div>
   <div class="grid-background"></div>
   
+  <!-- Sound Controls (always visible) -->
+  <div class="sound-controls">
+    <button id="music-toggle" class="sound-btn" title="Toggle Music">🎵</button>
+    <button id="sound-toggle" class="sound-btn" title="Toggle Sound">🔊</button>
+    <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="50" title="Volume">
+  </div>
+  
   <!-- Pause Overlay -->
   <div id="pause-overlay" class="pause-overlay">
     <div class="pause-content">
@@ -263,6 +270,7 @@
   </div>
   
   <script src="/socket.io/socket.io.js"></script>
+  <script src="sounds.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

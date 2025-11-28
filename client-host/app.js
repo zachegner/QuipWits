@@ -246,6 +246,51 @@ function clearSession() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize sound effects
+  if (window.SoundManager) {
+    SoundManager.init();
+    
+    // Setup sound controls
+    const soundToggle = document.getElementById('sound-toggle');
+    const musicToggle = document.getElementById('music-toggle');
+    const volumeSlider = document.getElementById('volume-slider');
+    
+    if (soundToggle) {
+      soundToggle.textContent = SoundManager.enabled ? '🔊' : '🔇';
+      soundToggle.addEventListener('click', () => {
+        const enabled = SoundManager.toggle();
+        soundToggle.textContent = enabled ? '🔊' : '🔇';
+      });
+    }
+    
+    if (musicToggle) {
+      musicToggle.textContent = SoundManager.musicEnabled ? '🎵' : '🎵';
+      musicToggle.style.opacity = SoundManager.musicEnabled ? '1' : '0.5';
+      musicToggle.addEventListener('click', () => {
+        const enabled = SoundManager.toggleMusic();
+        musicToggle.style.opacity = enabled ? '1' : '0.5';
+      });
+    }
+    
+    if (volumeSlider) {
+      volumeSlider.value = SoundManager.volume * 100;
+      volumeSlider.addEventListener('input', (e) => {
+        const vol = e.target.value / 100;
+        SoundManager.setVolume(vol);
+        SoundManager.setMusicVolume(vol * 0.6); // Music slightly quieter
+      });
+    }
+    
+    // Start lobby music on first user interaction (required by browsers)
+    const startMusicOnInteraction = () => {
+      SoundManager.playMusic();
+      document.removeEventListener('click', startMusicOnInteraction);
+      document.removeEventListener('keydown', startMusicOnInteraction);
+    };
+    document.addEventListener('click', startMusicOnInteraction);
+    document.addEventListener('keydown', startMusicOnInteraction);
+  }
+  
   // Setup join URL with network detection and QR code
   await setupJoinUrl();
   
@@ -393,15 +438,27 @@ socket.on('error', (data) => {
 });
 
 socket.on('room_update', (data) => {
+  const previousCount = players.length;
   players = data.players;
   updatePlayerList();
   updateStartButton();
+  
+  // Play sound when new player joins
+  if (players.length > previousCount && window.SoundManager) {
+    SoundManager.play('playerJoin');
+  }
 });
 
 socket.on('game_started', (data) => {
   console.log('Game started with', data.playerCount, 'players');
   gameTheme = data.theme || null;
   updateThemeDisplays();
+  
+  // Fade out lobby music and play game start sound
+  if (window.SoundManager) {
+    SoundManager.fadeOutMusic(1500);
+    setTimeout(() => SoundManager.play('gameStart'), 500);
+  }
 });
 
 socket.on('prompt_phase', (data) => {
@@ -417,6 +474,16 @@ socket.on('prompt_phase', (data) => {
 
 socket.on('timer_update', (data) => {
   updateTimer(data.remaining);
+  
+  // Play countdown tick for last 5 seconds
+  if (data.remaining <= 5 && data.remaining > 0 && window.SoundManager) {
+    SoundManager.play('tick');
+  }
+  
+  // Play buzzer when time runs out
+  if (data.remaining === 0 && window.SoundManager) {
+    SoundManager.play('buzzer');
+  }
 });
 
 socket.on('player_submitted', (data) => {
@@ -456,6 +523,11 @@ socket.on('vote_matchup', (data) => {
   document.getElementById('answer-2-text').textContent = data.answer2;
   document.getElementById('vote-count-1').textContent = '0';
   document.getElementById('vote-count-2').textContent = '0';
+  
+  // Play whoosh sound for new matchup
+  if (window.SoundManager) {
+    SoundManager.play('whoosh');
+  }
 });
 
 socket.on('player_voted', (data) => {
@@ -484,6 +556,11 @@ socket.on('matchup_result', (data) => {
         <div class="points">JINX! 0 points each</div>
       </div>
     `;
+    
+    // Play jinx sound
+    if (window.SoundManager) {
+      SoundManager.play('jinx');
+    }
   } else {
     const winner1 = data.player1Votes > data.player2Votes;
     const winner2 = data.player2Votes > data.player1Votes;
@@ -505,6 +582,15 @@ socket.on('matchup_result', (data) => {
     
     if (data.quipwit) {
       quipwitDisplay.style.display = 'block';
+      // Play quipwit sound
+      if (window.SoundManager) {
+        SoundManager.play('quipwit');
+      }
+    } else {
+      // Play normal result sound
+      if (window.SoundManager) {
+        SoundManager.play('ding');
+      }
     }
   }
 });
@@ -521,12 +607,22 @@ socket.on('round_scores', (data) => {
       <div class="score-points">${player.score}</div>
     </div>
   `).join('');
+  
+  // Play round end sound
+  if (window.SoundManager) {
+    SoundManager.play('roundEnd');
+  }
 });
 
 socket.on('last_lash_phase', (data) => {
   showScreen('lastLash');
   document.getElementById('last-lash-prompt').textContent = data.prompt;
   document.getElementById('last-lash-submissions').innerHTML = '';
+  
+  // Play dramatic fanfare for Last Wit
+  if (window.SoundManager) {
+    SoundManager.play('fanfare');
+  }
 });
 
 socket.on('last_lash_voting', (data) => {
@@ -559,6 +655,11 @@ socket.on('last_lash_results', (data) => {
 
 socket.on('game_over', (data) => {
   showScreen('gameOver');
+  
+  // Play victory sound
+  if (window.SoundManager) {
+    SoundManager.play('victory');
+  }
   
   if (data.winners && data.winners.length > 0) {
     const winnerNames = data.winners.map(w => w.name).join(' & ');
