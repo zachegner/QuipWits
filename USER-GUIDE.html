@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuipWits - Player's Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --neon-pink: #ff00ff;
+      --neon-cyan: #00ffff;
+      --neon-purple: #bf00ff;
+      --neon-blue: #0080ff;
+      --neon-yellow: #ffff00;
+      --dark-bg: #0a0a1a;
+      --darker-bg: #050510;
+      --grid-color: rgba(255, 0, 255, 0.1);
+      --text-white: #ffffff;
+      --text-gray: #aaaaaa;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Orbitron', sans-serif;
+      background: linear-gradient(180deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
+      color: var(--text-white);
+      min-height: 100vh;
+      line-height: 1.7;
+    }
+
+    /* Scanline effect */
+    .scanlines {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.1) 0px,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+    }
+
+    /* Grid background */
+    .grid-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: 50px 50px;
+      z-index: -1;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .title {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 3.5rem;
+      text-transform: uppercase;
+      color: var(--neon-cyan);
+      text-shadow: 
+        0 0 10px var(--neon-cyan),
+        0 0 20px var(--neon-cyan),
+        0 0 40px var(--neon-cyan),
+        0 0 80px var(--neon-pink);
+      margin-bottom: 1rem;
+      letter-spacing: 0.15em;
+    }
+
+    .subtitle {
+      font-size: 1.2rem;
+      color: var(--neon-pink);
+      text-shadow: 0 0 10px var(--neon-pink);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    .tagline {
+      margin-top: 2rem;
+      font-size: 1rem;
+      color: var(--text-gray);
+      font-style: italic;
+    }
+
+    /* Section styling */
+    .section {
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid var(--neon-purple);
+      border-radius: 15px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 0 20px rgba(191, 0, 255, 0.2);
+    }
+
+    .section-title {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.3rem;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 10px var(--neon-cyan);
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+    }
+
+    .section-title.pink {
+      color: var(--neon-pink);
+      text-shadow: 0 0 10px var(--neon-pink);
+      border-bottom-color: rgba(255, 0, 255, 0.3);
+    }
+
+    .section-title.yellow {
+      color: var(--neon-yellow);
+      text-shadow: 0 0 10px var(--neon-yellow);
+      border-bottom-color: rgba(255, 255, 0, 0.3);
+    }
+
+    /* Content text */
+    p {
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+
+    .highlight {
+      color: var(--neon-cyan);
+      text-shadow: 0 0 5px var(--neon-cyan);
+    }
+
+    .highlight-pink {
+      color: var(--neon-pink);
+      text-shadow: 0 0 5px var(--neon-pink);
+    }
+
+    .highlight-yellow {
+      color: var(--neon-yellow);
+      text-shadow: 0 0 5px var(--neon-yellow);
+    }
+
+    /* Step list */
+    .step-list {
+      list-style: none;
+      counter-reset: step-counter;
+    }
+
+    .step-list li {
+      position: relative;
+      padding-left: 3.5rem;
+      margin-bottom: 1.5rem;
+      counter-increment: step-counter;
+    }
+
+    .step-list li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.2rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px var(--neon-pink);
+    }
+
+    .step-title {
+      font-weight: bold;
+      color: var(--neon-cyan);
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+
+    /* Tip boxes */
+    .tip-box {
+      background: rgba(0, 255, 255, 0.1);
+      border-left: 4px solid var(--neon-cyan);
+      padding: 1rem 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .tip-box.warning {
+      background: rgba(255, 255, 0, 0.1);
+      border-left-color: var(--neon-yellow);
+    }
+
+    .tip-label {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.7rem;
+      color: var(--neon-cyan);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.2em;
+    }
+
+    .tip-box.warning .tip-label {
+      color: var(--neon-yellow);
+    }
+
+    /* Score table */
+    .score-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+
+    .score-table th,
+    .score-table td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(191, 0, 255, 0.3);
+    }
+
+    .score-table th {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.7rem;
+      color: var(--neon-purple);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .score-table td:last-child {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9rem;
+      color: var(--neon-yellow);
+      text-shadow: 0 0 8px var(--neon-yellow);
+      text-align: right;
+    }
+
+    /* Divider */
+    .divider {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--neon-purple), transparent);
+      margin: 3rem 0;
+    }
+
+    /* Phase cards */
+    .phase-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .phase-card {
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid var(--neon-pink);
+      border-radius: 10px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .phase-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 0 25px rgba(255, 0, 255, 0.4);
+    }
+
+    .phase-card h4 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.8rem;
+      color: var(--neon-pink);
+      margin-bottom: 0.8rem;
+    }
+
+    .phase-card p {
+      font-size: 0.85rem;
+      color: var(--text-gray);
+      margin-bottom: 0;
+    }
+
+    /* Player requirements */
+    .player-req {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin: 1.5rem 0;
+      flex-wrap: wrap;
+    }
+
+    .player-box {
+      background: rgba(191, 0, 255, 0.15);
+      border: 1px solid var(--neon-purple);
+      border-radius: 8px;
+      padding: 1rem 2rem;
+      text-align: center;
+    }
+
+    .player-box span {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-gray);
+      margin-bottom: 0.3rem;
+    }
+
+    .player-box strong {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5rem;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 10px var(--neon-cyan);
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 3rem 0;
+      color: var(--text-gray);
+      font-size: 0.85rem;
+    }
+
+    .footer-title {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1rem;
+      color: var(--neon-purple);
+      text-shadow: 0 0 10px var(--neon-purple);
+      margin-bottom: 1rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .title {
+        font-size: 2rem;
+      }
+
+      .section-title {
+        font-size: 1rem;
+      }
+
+      .container {
+        padding: 1.5rem 1rem;
+      }
+
+      .step-list li {
+        padding-left: 3rem;
+      }
+
+      .step-list li::before {
+        width: 2rem;
+        height: 2rem;
+        font-size: 0.9rem;
+      }
+    }
+
+    /* Neon line accent */
+    .neon-line {
+      height: 4px;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink), var(--neon-purple));
+      margin: 2rem 0;
+      border-radius: 2px;
+      box-shadow: 0 0 10px var(--neon-pink);
+    }
+
+    /* Example prompt styling */
+    .example-prompt {
+      font-style: italic;
+      color: var(--text-gray);
+      background: rgba(0, 0, 0, 0.4);
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      border-left: 3px solid var(--neon-purple);
+    }
+  </style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="grid-background"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="title">QuipWits</h1>
+      <p class="subtitle">Player's Guide</p>
+      <p class="tagline">"Where clever answers meet neon lights"</p>
+    </header>
+
+    <!-- What is QuipWits -->
+    <section class="section">
+      <h2 class="section-title">What is This?</h2>
+      <p>
+        QuipWits is a party game for people who think they're funnier than everyone else. 
+        Spoiler: only one of you is right.
+      </p>
+      <p>
+        You'll get weird prompts, write ridiculous answers, and vote on which response deserves the crown. 
+        It's basically a wit showdown wrapped in synthwave aesthetics.
+      </p>
+      <p>
+        One person hosts the game on a big screen (a laptop, TV, or anything with a browser). 
+        Everyone else joins on their phones. No app download needed. Just scan, type, and start roasting.
+      </p>
+
+      <div class="player-req">
+        <div class="player-box">
+          <span>Minimum</span>
+          <strong>3</strong>
+        </div>
+        <div class="player-box">
+          <span>Maximum</span>
+          <strong>8</strong>
+        </div>
+        <div class="player-box">
+          <span>Sweet Spot</span>
+          <strong>5-7</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- Getting Started -->
+    <section class="section">
+      <h2 class="section-title pink">Getting In</h2>
+      <ol class="step-list">
+        <li>
+          <span class="step-title">Find the Host Screen</span>
+          Look for the TV or laptop showing a big glowing room code. That's your portal.
+        </li>
+        <li>
+          <span class="step-title">Scan or Type</span>
+          Grab your phone. Either scan the QR code on screen or type the URL into your browser. 
+          Then punch in that four-letter room code.
+        </li>
+        <li>
+          <span class="step-title">Pick a Name</span>
+          Choose something memorable. Or embarrassing. Your call. 
+          Everyone will see it when you win (or lose spectacularly).
+        </li>
+        <li>
+          <span class="step-title">Wait for Launch</span>
+          Hang tight until the host hits that big START button. Maybe stretch your typing fingers.
+        </li>
+      </ol>
+
+      <div class="tip-box">
+        <p class="tip-label">Pro Tip</p>
+        <p style="margin-bottom: 0;">Stay on the same WiFi network as the host. QuipWits runs locally, so no internet dependency once you're connected. Just don't wander off to the other side of the house.</p>
+      </div>
+    </section>
+
+    <!-- How to Play -->
+    <section class="section">
+      <h2 class="section-title">The Breakdown</h2>
+      <p>
+        The game runs through <span class="highlight">two regular rounds</span> plus 
+        <span class="highlight-yellow">The Last Wit</span> finale. Each round has three phases:
+      </p>
+
+      <div class="phase-grid">
+        <div class="phase-card">
+          <h4>Answer</h4>
+          <p>You get prompts. You write something clever, dumb, or both.</p>
+        </div>
+        <div class="phase-card">
+          <h4>Vote</h4>
+          <p>Two answers face off. Pick your favorite. Democracy at its finest.</p>
+        </div>
+        <div class="phase-card">
+          <h4>Score</h4>
+          <p>Points get tallied. Egos get bruised. Repeat.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="neon-line"></div>
+
+    <!-- Round Details -->
+    <section class="section">
+      <h2 class="section-title">Round Mechanics</h2>
+      
+      <h3 style="color: var(--neon-pink); margin: 1.5rem 0 1rem; font-size: 1rem;">The Prompts</h3>
+      <p>
+        Each player gets two prompts per round. You'll see fill-in-the-blank questions or open-ended setups. 
+        The goal? Write something that makes people pick yours over the competition.
+      </p>
+      <p class="example-prompt">
+        "The worst thing to say on a first date is ___"
+      </p>
+      <p class="example-prompt">
+        "Scientists just discovered a new planet called ___"
+      </p>
+      <p>
+        You've got <span class="highlight">90 seconds</span> per prompt. The clock is real. 
+        If time runs out before you submit, you get "[No answer]" and zero dignity.
+      </p>
+
+      <h3 style="color: var(--neon-pink); margin: 1.5rem 0 1rem; font-size: 1rem;">The Showdown</h3>
+      <p>
+        Every prompt gets answered by two players. During voting, both answers appear head-to-head 
+        on the big screen. Nobody knows who wrote what until the reveal.
+      </p>
+      <p>
+        Everyone except the two authors votes. No voting for yourself (we thought of that).
+      </p>
+
+      <div class="tip-box warning">
+        <p class="tip-label">Watch Out</p>
+        <p style="margin-bottom: 0;">If you and your opponent write the exact same answer, that's a <span class="highlight-yellow">JINX</span>. No points for either of you. Great minds think alike, but only one can win.</p>
+      </div>
+    </section>
+
+    <!-- Scoring -->
+    <section class="section">
+      <h2 class="section-title yellow">Points</h2>
+      <p>
+        This isn't participation trophy territory. Points matter. Here's how they stack up:
+      </p>
+
+      <table class="score-table">
+        <tr>
+          <th>What Happened</th>
+          <th>Points</th>
+        </tr>
+        <tr>
+          <td>Each vote your answer gets</td>
+          <td>+100</td>
+        </tr>
+        <tr>
+          <td><span class="highlight-yellow">QUIPWIT</span> - Everyone voted for you</td>
+          <td>+100 Bonus</td>
+        </tr>
+        <tr>
+          <td>JINX - Same answer as opponent</td>
+          <td>0</td>
+        </tr>
+      </table>
+
+      <p>
+        A QuipWit is the holy grail. It means every single voter chose your answer. 
+        You get the standard vote points PLUS a 100-point bonus for being unanimously hilarious.
+      </p>
+    </section>
+
+    <!-- The Last Wit -->
+    <section class="section">
+      <h2 class="section-title yellow">The Last Wit</h2>
+      <p>
+        After two rounds, it's finale time. One final prompt. Everyone answers. 
+        The stakes are ridiculous.
+      </p>
+      <p>
+        Instead of head-to-head voting, all answers are shown at once (anonymously). 
+        Each player picks their <span class="highlight">top three favorites</span> in order.
+      </p>
+
+      <table class="score-table">
+        <tr>
+          <th>Ranking</th>
+          <th>Points</th>
+        </tr>
+        <tr>
+          <td>Someone ranked you 1st</td>
+          <td>+300</td>
+        </tr>
+        <tr>
+          <td>Someone ranked you 2nd</td>
+          <td>+200</td>
+        </tr>
+        <tr>
+          <td>Someone ranked you 3rd</td>
+          <td>+100</td>
+        </tr>
+      </table>
+
+      <p>
+        This is where comebacks happen. Or where the leader extends their reign. 
+        Either way, it's going to get loud.
+      </p>
+    </section>
+
+    <div class="neon-line"></div>
+
+    <!-- Strategies -->
+    <section class="section">
+      <h2 class="section-title pink">Winning Tactics</h2>
+      
+      <p><strong style="color: var(--neon-cyan);">Know Your Audience</strong></p>
+      <p>
+        Inside jokes land harder than generic humor. If your group spent last summer obsessing over 
+        that one meme, use it. Context is comedy.
+      </p>
+
+      <p><strong style="color: var(--neon-cyan);">Short Hits Different</strong></p>
+      <p>
+        You've got 100 characters. Sometimes "Jeff" is funnier than a three-sentence explanation. 
+        Brevity is the soul of wit, or whatever that guy said.
+      </p>
+
+      <p><strong style="color: var(--neon-cyan);">The Unexpected Angle</strong></p>
+      <p>
+        Everyone's first instinct is probably the same. Your second or third idea? That's where gold lives. 
+        Zig when they zag.
+      </p>
+
+      <p><strong style="color: var(--neon-cyan);">Commit to the Bit</strong></p>
+      <p>
+        Half-clever answers die in voting. If you're going absurd, go ALL the way absurd. 
+        Confidence reads through text.
+      </p>
+
+      <div class="tip-box">
+        <p class="tip-label">The Real Secret</p>
+        <p style="margin-bottom: 0;">Make yourself laugh first. If you're grinning while typing it, you're probably onto something.</p>
+      </div>
+    </section>
+
+    <!-- Themed Games -->
+    <section class="section">
+      <h2 class="section-title">Themed Rounds</h2>
+      <p>
+        The host can set a theme before starting. When AI prompts are enabled, this generates 
+        custom questions around that topic.
+      </p>
+      <p>
+        Themes like "80s movies," "office life," "dating disasters," or "space exploration" 
+        shape what kind of prompts appear. It's the same game, but with focused chaos.
+      </p>
+      <p>
+        No theme? Standard prompts pull from a curated collection of weird questions 
+        designed to get strange answers.
+      </p>
+    </section>
+
+    <!-- Technical Notes -->
+    <section class="section">
+      <h2 class="section-title">Practical Stuff</h2>
+      
+      <p><strong style="color: var(--neon-cyan);">Connection Dropped?</strong></p>
+      <p>
+        Refresh your browser and rejoin with the same name. The game tracks players, 
+        so you'll jump back in where you left off.
+      </p>
+
+      <p><strong style="color: var(--neon-cyan);">Timer Running Down?</strong></p>
+      <p>
+        Submit early if you're done. Better to lock in a decent answer than panic-type 
+        something forgettable in the last five seconds.
+      </p>
+
+      <p><strong style="color: var(--neon-cyan);">Game Paused?</strong></p>
+      <p>
+        The host can pause anytime. Bathroom breaks, snack runs, whatever. 
+        Your phone will show a pause screen. Just wait it out.
+      </p>
+
+      <p><strong style="color: var(--neon-cyan);">Want to Quit?</strong></p>
+      <p>
+        Close the browser tab. The game continues without you. 
+        Your prompts either get auto-filled or skipped. No hard feelings (from the game, at least).
+      </p>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="footer-title">QuipWits</p>
+      <p>Now get in there and prove you're the funniest one in the room.</p>
+      <p style="margin-top: 1rem; color: var(--neon-purple);">Or at least funnier than Dave.</p>
+    </footer>
+
+  </div>
+</body>
+</html>

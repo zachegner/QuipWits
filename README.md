@@ -1,10 +1,8 @@
-# 🎮 QuipWits Party Game
+# QuipWits Party Game
 
 A hilarious QuipWits party game you can host locally on your computer! Players join via their phones and compete to write the funniest answers.
 
-## 🚀 Quick Start (No Installation Required!)
-
-Just download and run - no Node.js or any other software needed!
+## Quick Start (No Installation Required!)
 
 ### Download
 
@@ -33,7 +31,7 @@ That's it! The server will start and show you the connection info.
 
 ---
 
-## 🎯 How to Play
+## How to Play
 
 1. **Host**: Open the URL shown in the terminal (usually `http://localhost:3000/host`) on a TV or large screen
 2. **Players**: On phones/tablets, go to the address shown (e.g., `http://192.168.1.X:3000/play`)
@@ -48,7 +46,7 @@ That's it! The server will start and show you the connection info.
 
 ---
 
-## 🤖 AI-Powered Prompts (Optional)
+## AI-Powered Prompts (Optional)
 
 The game includes hundreds of pre-made prompts, but you can enable **AI-generated prompts** for endless variety!
 
@@ -62,7 +60,7 @@ Without an API key, the game works perfectly with built-in prompts!
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Settings are saved to:
 - **Windows**: `%APPDATA%\QuipWits\config.json`
@@ -78,7 +76,7 @@ Settings are saved to:
 
 ---
 
-## 🌐 Network Setup
+## Network Setup
 
 All players must be on the **same WiFi network** as the host computer.
 
@@ -96,7 +94,7 @@ All players must be on the **same WiFi network** as the host computer.
 
 ---
 
-## 📱 Sharing the Join Link
+## Sharing the Join Link
 
 The easiest way to share is to:
 1. Send the play URL to a group chat
@@ -104,7 +102,7 @@ The easiest way to share is to:
 
 ---
 
-## 🛠️ For Developers
+## For Developers
 
 If you want to run from source or contribute:
 
@@ -135,7 +133,7 @@ PORT=3000
 
 ---
 
-## 🎨 Game Features
+## Game Features
 
 - **Themed Games**: Enter a theme (e.g., "80s movies", "dating disasters") for themed prompts
 - **Pause/Resume**: Host can pause the game anytime
@@ -145,14 +143,14 @@ PORT=3000
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 - Modern web browser (Chrome, Firefox, Safari, Edge)
 - All players on the same local network
 
 ---
 
-## 🎉 Enjoy Your Game Night!
+## Enjoy Your Game Night!
 
 Questions or issues? Check the terminal output for error messages.
 
