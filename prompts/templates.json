@@ -1,0 +1,93 @@
+{
+  "templates": [
+    "A terrible name for a {noun}-themed restaurant",
+    "The worst possible {noun} flavor of ice cream",
+    "Something you should never say during a {event}",
+    "A rejected name for a {noun} superhero",
+    "The worst thing to find in your {place}",
+    "A bad slogan for a {noun} company",
+    "Something a {noun} would never say",
+    "The worst {noun} to bring to a first date",
+    "A rejected Disney movie title: '{adjective} {noun}'",
+    "The worst advice for someone learning to {activity}",
+    "Something you shouldn't yell at a {event}",
+    "A terrible {noun}-based pickup line",
+    "The worst thing to name your {noun}",
+    "Something a {adjective} wizard would say",
+    "A bad reason to call in sick: '{noun} emergency'",
+    "The worst superpower: the ability to {activity} {adverb}",
+    "Something you'd never want to hear from your {person}",
+    "A rejected breakfast cereal: '{adjective} {noun}s'",
+    "The worst thing to discover in your {noun}",
+    "A terrible tattoo idea involving a {noun}",
+    "Something that would ruin a {event}",
+    "The worst {noun} to use as a weapon",
+    "A bad name for a {adjective} band",
+    "Something a {noun} secretly thinks about",
+    "The worst thing to say when meeting your {person}",
+    "A rejected Olympic sport: competitive {activity}",
+    "The worst {noun} to find in your pocket",
+    "Something that doesn't belong in a {place}",
+    "A bad excuse: 'Sorry I'm late, I was busy {activity}'",
+    "The worst {adjective} {noun} in the world",
+    "Something you shouldn't do at a {place}",
+    "A terrible children's book: 'The {adjective} {noun}'",
+    "The worst thing to whisper to a {noun}",
+    "Something a {adjective} robot would say",
+    "A bad way to impress your {person}",
+    "The worst {noun} to put on a pizza",
+    "Something you'd never hear at a {event}",
+    "A rejected app idea: {noun}ify",
+    "The worst thing about being a {noun}",
+    "Something that would make a {noun} cry",
+    "A terrible way to start a {event}",
+    "The worst {noun} costume for Halloween",
+    "Something a {noun} dreams about",
+    "A bad {noun}-related world record",
+    "The worst thing to automate with {noun}",
+    "Something you shouldn't bring to a {place}",
+    "A rejected greeting card: 'Sorry about your {noun}'",
+    "The worst {adjective} invention ever",
+    "Something a {noun} would put on their resume",
+    "A terrible name for a {noun} support group"
+  ],
+  "fillWords": {
+    "noun": [
+      "llama", "tornado", "grandma", "bitcoin", "toilet", "clown", "burrito",
+      "vampire", "toaster", "dinosaur", "banana", "robot", "penguin", "wizard",
+      "pickle", "ninja", "unicorn", "cactus", "potato", "dolphin", "taco",
+      "ghost", "pirate", "zombie", "dragon", "muffin", "raccoon", "waffle",
+      "alien", "mushroom", "octopus", "chicken", "skeleton", "hamster", "broccoli"
+    ],
+    "adjective": [
+      "angry", "invisible", "expired", "haunted", "flaming", "suspicious",
+      "soggy", "radioactive", "sparkly", "screaming", "confused", "depressed",
+      "aggressive", "romantic", "sleepy", "electric", "awkward", "legendary",
+      "forbidden", "mysterious", "sassy", "grumpy", "majestic", "chaotic"
+    ],
+    "place": [
+      "funeral", "dentist office", "library", "Walmart", "church", "gym",
+      "wedding", "hospital", "elevator", "subway", "bathroom", "basement",
+      "attic", "playground", "office", "restaurant", "movie theater", "zoo"
+    ],
+    "event": [
+      "job interview", "first date", "wedding", "funeral", "surgery",
+      "court hearing", "magic show", "birthday party", "graduation",
+      "family reunion", "performance review", "driving test", "exorcism",
+      "baby shower", "divorce proceedings", "police interrogation"
+    ],
+    "activity": [
+      "skydiving", "cooking", "dancing", "sleeping", "swimming", "juggling",
+      "yodeling", "breakdancing", "meditating", "beatboxing", "knitting",
+      "parkour", "moonwalking", "planking", "dabbing", "flossing"
+    ],
+    "adverb": [
+      "aggressively", "seductively", "sadly", "loudly", "backwards",
+      "underwater", "invisibly", "reluctantly", "majestically", "violently"
+    ],
+    "person": [
+      "boss", "mother-in-law", "therapist", "dentist", "neighbor",
+      "uber driver", "priest", "ex", "doctor", "parole officer", "landlord"
+    ]
+  }
+}

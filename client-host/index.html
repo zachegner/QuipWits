@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QUIPWITS - Host</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="grid-background"></div>
+  
+  <!-- Pause Overlay -->
+  <div id="pause-overlay" class="pause-overlay">
+    <div class="pause-content">
+      <h1 class="pause-title">⏸ PAUSED</h1>
+      <p class="pause-text">Click anywhere to resume</p>
+    </div>
+  </div>
+  
+  <div class="container">
+    <!-- Setup Screen (API Key Configuration) -->
+    <div id="setup-screen" class="screen">
+      <h1 class="title glitch" data-text="QUIPWITS">QUIPWITS</h1>
+      <div class="setup-container">
+        <h2 class="section-title">⚙️ SETUP</h2>
+        
+        <div class="setup-section">
+          <div class="network-info">
+            <p class="label">PLAYERS CAN JOIN AT</p>
+            <p class="url neon-text" id="setup-join-url">Loading...</p>
+          </div>
+        </div>
+        
+        <div class="setup-section">
+          <h3 class="setup-label">AI PROMPTS (Optional)</h3>
+          <p class="setup-hint">Add an Anthropic API key to enable AI-generated prompts. Without it, the game uses pre-made prompts.</p>
+          
+          <div class="api-key-status" id="api-key-status">
+            <span class="status-icon" id="api-status-icon">❌</span>
+            <span id="api-status-text">No API key configured</span>
+          </div>
+          
+          <div class="api-key-input-container">
+            <input type="password" id="api-key-input" class="api-key-input" placeholder="sk-ant-api..." autocomplete="off">
+            <button id="toggle-api-key" class="toggle-btn">👁</button>
+          </div>
+          
+          <div class="api-key-actions">
+            <label class="checkbox-label">
+              <input type="checkbox" id="save-api-key" checked>
+              Save API key for future sessions
+            </label>
+            <button id="save-api-btn" class="control-btn">SAVE API KEY</button>
+            <button id="test-api-btn" class="control-btn secondary">TEST</button>
+          </div>
+          
+          <p class="api-key-note">Get your API key at <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a></p>
+        </div>
+        
+        <button id="continue-to-lobby-btn" class="neon-button">CONTINUE TO LOBBY →</button>
+      </div>
+    </div>
+    
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" class="screen active">
+      <h1 class="title glitch" data-text="QUIPWITS">QUIPWITS</h1>
+      <div class="room-code-container">
+        <div class="join-info">
+          <div class="qr-section">
+            <p class="label">SCAN TO JOIN</p>
+            <div class="qr-code-container" id="qr-code"></div>
+          </div>
+          <div class="join-details">
+            <p class="label">OR GO TO</p>
+            <p class="url neon-text" id="join-url">Loading...</p>
+            <p class="label">ROOM CODE</p>
+            <p class="room-code neon-box" id="room-code">----</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="players-section">
+        <h2 class="section-title">PLAYERS</h2>
+        <div class="player-list" id="player-list">
+          <p class="waiting-text">Waiting for players...</p>
+        </div>
+        <p class="player-count"><span id="player-count">0</span>/<span id="max-players">8</span> Players</p>
+      </div>
+      
+      <button id="start-btn" class="neon-button" disabled>
+        NEED 3+ PLAYERS
+      </button>
+      
+      <div class="host-controls" id="lobby-controls">
+        <div class="theme-input-container">
+          <label for="theme-input" class="theme-label">GAME THEME (optional)</label>
+          <input type="text" id="theme-input" class="theme-input" placeholder="e.g., 80s movies, space, dating disasters" maxlength="120">
+        </div>
+        <button id="settings-btn" class="control-btn secondary">⚙️ SETTINGS</button>
+        <div class="ai-status-badge" id="lobby-ai-status">
+          <span class="ai-badge-icon">🤖</span>
+          <span class="ai-badge-text" id="lobby-ai-text">AI Disabled</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Prompt Phase Screen -->
+    <div id="prompt-screen" class="screen">
+      <h2 class="phase-title">ROUND <span id="current-round">1</span></h2>
+      <p class="theme-display" id="theme-display-prompt" style="display: none;"></p>
+      <p class="phase-subtitle">Answer your prompts!</p>
+      
+      <div class="timer-container">
+        <div class="timer-bar">
+          <div class="timer-fill" id="prompt-timer-fill"></div>
+        </div>
+        <span class="timer-text" id="prompt-timer">60</span>
+      </div>
+      
+      <div class="submission-status">
+        <h3>Submissions</h3>
+        <div class="submission-list" id="submission-list"></div>
+      </div>
+      
+      <div class="host-controls" id="prompt-controls">
+        <button class="control-btn" id="pause-btn">PAUSE</button>
+      </div>
+    </div>
+    
+    <!-- Voting Screen -->
+    <div id="voting-screen" class="screen">
+      <h2 class="phase-title">VOTE!</h2>
+      <p class="theme-display" id="theme-display-voting" style="display: none;"></p>
+      <p class="matchup-counter">Matchup <span id="matchup-num">1</span> of <span id="total-matchups">6</span></p>
+      
+      <div class="prompt-display">
+        <p class="prompt-text" id="vote-prompt-text">Loading prompt...</p>
+      </div>
+      
+      <div class="answers-container">
+        <div class="answer-box answer-1">
+          <div class="answer-label">A</div>
+          <p class="answer-text" id="answer-1-text">Answer 1</p>
+          <div class="vote-count" id="vote-count-1">0</div>
+        </div>
+        <div class="versus">VS</div>
+        <div class="answer-box answer-2">
+          <div class="answer-label">B</div>
+          <p class="answer-text" id="answer-2-text">Answer 2</p>
+          <div class="vote-count" id="vote-count-2">0</div>
+        </div>
+      </div>
+      
+      <div class="timer-container">
+        <div class="timer-bar">
+          <div class="timer-fill" id="vote-timer-fill"></div>
+        </div>
+        <span class="timer-text" id="vote-timer">30</span>
+      </div>
+    </div>
+    
+    <!-- Result Screen -->
+    <div id="result-screen" class="screen">
+      <div class="result-content">
+        <p class="result-prompt" id="result-prompt-text">Prompt text</p>
+        
+        <div class="result-answers" id="result-answers">
+          <!-- Filled by JS -->
+        </div>
+        
+        <div class="jinx-display" id="jinx-display" style="display: none;">
+          <h2 class="jinx-title">🔗 JINX! 🔗</h2>
+          <p class="jinx-text">Same answer - no points!</p>
+        </div>
+        
+        <div class="quipwit-display" id="quipwit-display" style="display: none;">
+          <h2 class="quipwit-title">⚡ QUIPWIT! ⚡</h2>
+          <p class="quipwit-text">+100 BONUS!</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Scoreboard Screen -->
+    <div id="scoreboard-screen" class="screen">
+      <h2 class="phase-title">ROUND <span id="score-round">1</span> SCORES</h2>
+      
+      <div class="scoreboard" id="scoreboard">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+    
+    <!-- Last Wit Screen -->
+    <div id="last-lash-screen" class="screen">
+      <h2 class="phase-title last-lash-title">THE LAST WIT!</h2>
+      <p class="theme-display" id="theme-display-lastlash" style="display: none;"></p>
+      <p class="phase-subtitle">Everyone answers the same prompt!</p>
+      
+      <div class="prompt-display final-prompt">
+        <p class="prompt-text" id="last-lash-prompt">Loading...</p>
+      </div>
+      
+      <div class="timer-container">
+        <div class="timer-bar">
+          <div class="timer-fill" id="last-lash-timer-fill"></div>
+        </div>
+        <span class="timer-text" id="last-lash-timer">90</span>
+      </div>
+      
+      <div class="submission-status">
+        <h3>Submissions</h3>
+        <div class="submission-list" id="last-lash-submissions"></div>
+      </div>
+    </div>
+    
+    <!-- Last Wit Voting Screen -->
+    <div id="last-lash-voting-screen" class="screen">
+      <h2 class="phase-title">PICK YOUR TOP 3!</h2>
+      
+      <div class="prompt-display">
+        <p class="prompt-text" id="ll-vote-prompt">Prompt</p>
+      </div>
+      
+      <div class="last-lash-answers" id="ll-answers">
+        <!-- Filled by JS -->
+      </div>
+      
+      <div class="timer-container">
+        <div class="timer-bar">
+          <div class="timer-fill" id="ll-vote-timer-fill"></div>
+        </div>
+        <span class="timer-text" id="ll-vote-timer">45</span>
+      </div>
+    </div>
+    
+    <!-- Last Wit Results Screen -->
+    <div id="last-lash-results-screen" class="screen">
+      <h2 class="phase-title">LAST WIT RESULTS!</h2>
+      
+      <div class="ll-results" id="ll-results">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+    
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="screen">
+      <h1 class="winner-title">GAME OVER!</h1>
+      
+      <div class="winner-display" id="winner-display">
+        <h2 class="winner-name" id="winner-name">Winner Name</h2>
+        <p class="winner-score" id="winner-score">0 points</p>
+      </div>
+      
+      <div class="final-scoreboard" id="final-scoreboard">
+        <!-- Filled by JS -->
+      </div>
+      
+      <button id="new-game-btn" class="neon-button">NEW GAME</button>
+    </div>
+  </div>
+  
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

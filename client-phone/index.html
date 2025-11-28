@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>QUIPWITS - Play</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Pause Overlay -->
+  <div id="pause-overlay" class="pause-overlay">
+    <div class="pause-content">
+      <div class="pause-icon">⏸</div>
+      <h2 class="pause-title">PAUSED</h2>
+      <p class="pause-text">Waiting for host to resume...</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Join Screen -->
+    <div id="join-screen" class="screen active">
+      <h1 class="title">QUIPWITS</h1>
+      
+      <div class="input-group">
+        <label class="input-label">ROOM CODE</label>
+        <input type="text" id="room-code-input" class="neon-input" 
+               maxlength="4" placeholder="ABCD" autocomplete="off"
+               autocapitalize="characters">
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">YOUR NAME</label>
+        <input type="text" id="name-input" class="neon-input" 
+               maxlength="15" placeholder="Enter name" autocomplete="off">
+      </div>
+      
+      <button id="join-btn" class="neon-button">JOIN GAME</button>
+      
+      <p class="error-message" id="error-message"></p>
+    </div>
+    
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" class="screen">
+      <h2 class="screen-title">JOINED!</h2>
+      <p class="player-name-display" id="display-name">PlayerName</p>
+      <p class="room-display">Room: <span id="display-room">ABCD</span></p>
+      
+      <div class="waiting-animation">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <p class="waiting-text">Waiting for host to start...</p>
+    </div>
+    
+    <!-- Answer Screen -->
+    <div id="answer-screen" class="screen">
+      <div class="prompt-header">
+        <span class="prompt-number">Prompt <span id="prompt-current">1</span> of <span id="prompt-total">2</span></span>
+        <span class="timer" id="answer-timer">60</span>
+      </div>
+      
+      <div class="prompt-box">
+        <p class="prompt-text" id="current-prompt">Loading prompt...</p>
+      </div>
+      
+      <div class="answer-input-container">
+        <textarea id="answer-input" class="answer-textarea" 
+                  placeholder="Type your answer..." 
+                  maxlength="100"></textarea>
+        <span class="char-count"><span id="char-count">0</span>/100</span>
+      </div>
+      
+      <button id="submit-answer-btn" class="neon-button">SUBMIT</button>
+    </div>
+    
+    <!-- Waiting for Others Screen -->
+    <div id="waiting-screen" class="screen">
+      <div class="checkmark">✓</div>
+      <h2 class="screen-title">SUBMITTED!</h2>
+      
+      <div class="waiting-animation">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <p class="waiting-text">Waiting for other players...</p>
+    </div>
+    
+    <!-- Voting Screen -->
+    <div id="voting-screen" class="screen">
+      <div class="vote-header">
+        <span class="timer" id="vote-timer">30</span>
+      </div>
+      
+      <div class="prompt-box small">
+        <p class="prompt-text" id="vote-prompt">Prompt text here</p>
+      </div>
+      
+      <div class="vote-buttons">
+        <button class="vote-btn vote-a" id="vote-a-btn">
+          <span class="vote-label">A</span>
+          <p class="vote-answer" id="vote-answer-a">Answer A</p>
+        </button>
+        
+        <button class="vote-btn vote-b" id="vote-b-btn">
+          <span class="vote-label">B</span>
+          <p class="vote-answer" id="vote-answer-b">Answer B</p>
+        </button>
+      </div>
+      
+      <p class="cannot-vote" id="cannot-vote" style="display: none;">
+        This is your matchup - watch the host screen!
+      </p>
+    </div>
+    
+    <!-- Vote Submitted Screen -->
+    <div id="vote-submitted-screen" class="screen">
+      <div class="checkmark">✓</div>
+      <h2 class="screen-title">VOTED!</h2>
+      <p class="waiting-text">Watch the host screen...</p>
+    </div>
+    
+    <!-- Last Wit Answer Screen -->
+    <div id="last-lash-screen" class="screen">
+      <h2 class="screen-title last-lash">THE LAST WIT!</h2>
+      
+      <div class="prompt-header">
+        <span class="timer" id="ll-answer-timer">90</span>
+      </div>
+      
+      <div class="prompt-box final">
+        <p class="prompt-text" id="ll-prompt">Loading...</p>
+      </div>
+      
+      <div class="answer-input-container">
+        <textarea id="ll-answer-input" class="answer-textarea" 
+                  placeholder="Make it your best!" 
+                  maxlength="100"></textarea>
+        <span class="char-count"><span id="ll-char-count">0</span>/100</span>
+      </div>
+      
+      <button id="ll-submit-btn" class="neon-button">SUBMIT</button>
+    </div>
+    
+    <!-- Last Wit Voting Screen -->
+    <div id="last-lash-voting-screen" class="screen">
+      <h2 class="screen-title">PICK YOUR TOP 3!</h2>
+      
+      <div class="prompt-header">
+        <span class="timer" id="ll-vote-timer">45</span>
+      </div>
+      
+      <div class="prompt-box small">
+        <p class="prompt-text" id="ll-vote-prompt">Prompt</p>
+      </div>
+      
+      <p class="pick-instruction">Tap to select: 1st, 2nd, 3rd</p>
+      
+      <div class="ll-vote-options" id="ll-vote-options">
+        <!-- Filled by JS -->
+      </div>
+      
+      <button id="ll-vote-submit-btn" class="neon-button" disabled>
+        SELECT 3 ANSWERS
+      </button>
+    </div>
+    
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="screen">
+      <h2 class="screen-title">GAME OVER!</h2>
+      <p class="final-message" id="final-message">Thanks for playing!</p>
+      <p class="final-score">Your Score: <span id="your-score">0</span></p>
+      
+      <button id="play-again-btn" class="neon-button">PLAY AGAIN</button>
+    </div>
+    
+    <!-- Kicked Screen -->
+    <div id="kicked-screen" class="screen">
+      <h2 class="screen-title error">KICKED</h2>
+      <p class="kicked-message">You have been removed from the game.</p>
+      <button id="rejoin-btn" class="neon-button">JOIN ANOTHER GAME</button>
+    </div>
+  </div>
+  
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
