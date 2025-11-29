@@ -18,7 +18,7 @@ const LAST_WIT_MODES = {
 
 // Game Configuration
 const CONFIG = {
-  MAX_PLAYERS: 8,
+  MAX_PLAYERS: 10,
   MIN_PLAYERS: 3,
   ROUNDS_PER_GAME: 2,  // 2 regular rounds + 1 Last Wit
   PROMPTS_PER_PLAYER: 2,

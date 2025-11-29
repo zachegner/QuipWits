@@ -131,8 +131,8 @@ describe('Game Logic', () => {
       });
     });
 
-    test('works with maximum players (8)', () => {
-      const room = createTestRoom(8);
+    test('works with maximum players (10)', () => {
+      const room = createTestRoom(10);
       gameLogic.assignPromptsToPlayers(room);
 
       expect(room.prompts.length).toBeGreaterThan(0);

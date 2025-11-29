@@ -132,6 +132,7 @@ describe('Prompt Generator', () => {
       expect(promptGenerator.getPromptsNeededForRound(6, 2)).toBe(6);
       expect(promptGenerator.getPromptsNeededForRound(3, 2)).toBe(3);
       expect(promptGenerator.getPromptsNeededForRound(8, 2)).toBe(8);
+      expect(promptGenerator.getPromptsNeededForRound(10, 2)).toBe(10);
     });
 
     test('UG-004b: handles odd numbers with ceiling', () => {

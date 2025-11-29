@@ -124,9 +124,9 @@ describe('Complete Game Flow', () => {
     });
   });
 
-  describe('IT-002: Complete 8-Player Game', () => {
+  describe('IT-002: Complete 10-Player Game', () => {
     test('handles maximum players correctly', () => {
-      const room = setupRoom(8);
+      const room = setupRoom(10);
       
       room.currentRound = 1;
       rooms.updateRoomState(room.code, GAME_STATES.PROMPT);
@@ -157,10 +157,10 @@ describe('Complete Game Flow', () => {
           p => p.id !== prompt.player1Id && p.id !== prompt.player2Id
         );
         
-        // With 8 players, each matchup should have at least 6 voters (8 - 2 participants)
+        // With 10 players, each matchup should have at least 8 voters (10 - 2 participants)
         // In practice, if assignment algorithm gives extra prompts, may be less
-        expect(voters.length).toBeGreaterThanOrEqual(5);
-        expect(voters.length).toBeLessThanOrEqual(6);
+        expect(voters.length).toBeGreaterThanOrEqual(7);
+        expect(voters.length).toBeLessThanOrEqual(8);
         
         voters.forEach((voter, i) => {
           gameLogic.submitVote(room, voter.id, prompt.id, i % 2 === 0 ? 1 : 2);
