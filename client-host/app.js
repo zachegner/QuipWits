@@ -23,6 +23,8 @@ const screens = {
   voting: document.getElementById('voting-screen'),
   result: document.getElementById('result-screen'),
   scoreboard: document.getElementById('scoreboard-screen'),
+  modeSelection: document.getElementById('mode-selection-screen'),
+  modeIntro: document.getElementById('mode-intro-screen'),
   lastLash: document.getElementById('last-lash-screen'),
   lastLashVoting: document.getElementById('last-lash-voting-screen'),
   lastLashResults: document.getElementById('last-lash-results-screen'),
@@ -613,6 +615,204 @@ socket.on('round_scores', (data) => {
   // Play round end sound
   if (window.SoundManager) {
     SoundManager.play('roundEnd');
+  }
+});
+
+// Last Wit Mode Reveal - spinning animation
+socket.on('last_wit_mode_reveal', (data) => {
+  showScreen('modeSelection');
+  lastWitMode = data.mode;
+  
+  // Run the spinning carousel animation
+  runModeSelectionAnimation(data.mode, data.allModes);
+});
+
+/**
+ * Run the slot machine style mode selection animation
+ * @param {string} selectedMode - The mode that was selected (FLASHBACK, WORD_LASH, ACRO_LASH)
+ * @param {string[]} allModes - All available modes for the carousel
+ */
+function runModeSelectionAnimation(selectedMode, allModes) {
+  const carousel = document.getElementById('mode-carousel');
+  const container = document.querySelector('.mode-carousel-container');
+  if (!carousel || !container) return;
+  
+  // Reset container state
+  container.classList.remove('selected');
+  
+  // Create extended mode list for smooth spinning (repeat modes multiple times)
+  const modes = ['FLASHBACK', 'WORD_LASH', 'ACRO_LASH'];
+  const extendedModes = [];
+  
+  // Add enough repetitions to fill 5 seconds of spinning
+  for (let i = 0; i < 15; i++) {
+    extendedModes.push(...modes);
+  }
+  
+  // Find where we want to land (somewhere in the middle of the extended array)
+  const targetIndex = extendedModes.length - modes.length + modes.indexOf(selectedMode);
+  
+  // Build the carousel HTML
+  carousel.innerHTML = extendedModes.map((mode, index) => `
+    <div class="mode-option" data-mode="${mode}" data-index="${index}">
+      <span class="mode-name">${getModeDisplayName(mode)}</span>
+    </div>
+  `).join('');
+  
+  // Animation variables
+  const itemHeight = 100; // Must match CSS .mode-option height
+  const totalDuration = 5000; // 5 seconds total
+  const startSpeed = 15; // Start at 15ms per item (very fast)
+  const endSpeed = 400; // End at 400ms per item (slow)
+  
+  let currentIndex = 0;
+  let elapsed = 0;
+  let lastTickTime = 0;
+  
+  carousel.classList.add('spinning');
+  
+  // Calculate easing - starts fast, slows down exponentially
+  function getDelay(progress) {
+    // Ease out cubic
+    const eased = 1 - Math.pow(1 - progress, 3);
+    return startSpeed + (endSpeed - startSpeed) * eased;
+  }
+  
+  // Play initial fanfare
+  if (window.SoundManager) {
+    SoundManager.play('fanfare');
+  }
+  
+  function tick() {
+    const now = Date.now();
+    const progress = elapsed / totalDuration;
+    
+    // Check if we've reached the end
+    if (currentIndex >= targetIndex || elapsed >= totalDuration) {
+      // Snap to final position
+      currentIndex = targetIndex;
+      const finalOffset = -(currentIndex * itemHeight) + itemHeight; // Center in view
+      carousel.style.transform = `translateY(${finalOffset}px)`;
+      carousel.classList.remove('spinning');
+      carousel.classList.add('slowing');
+      
+      // Mark the selected mode
+      const options = carousel.querySelectorAll('.mode-option');
+      options.forEach((opt, idx) => {
+        opt.classList.remove('active', 'selected');
+        if (idx === currentIndex) {
+          opt.classList.add('selected');
+        }
+      });
+      
+      // Flash the container
+      container.classList.add('selected');
+      
+      // Play selection sound
+      if (window.SoundManager) {
+        SoundManager.play('modeSelected');
+      }
+      
+      // Show intro screen after a brief pause
+      setTimeout(() => {
+        showModeIntroScreen(selectedMode);
+      }, 1500);
+      
+      return;
+    }
+    
+    // Calculate delay based on progress
+    const delay = getDelay(progress);
+    
+    if (now - lastTickTime >= delay) {
+      lastTickTime = now;
+      currentIndex++;
+      elapsed += delay;
+      
+      // Update position
+      const offset = -(currentIndex * itemHeight) + itemHeight; // Center current in view
+      carousel.style.transform = `translateY(${offset}px)`;
+      
+      // Update active state
+      const options = carousel.querySelectorAll('.mode-option');
+      options.forEach((opt, idx) => {
+        opt.classList.remove('active');
+        if (idx === currentIndex) {
+          opt.classList.add('active');
+        }
+      });
+      
+      // Play tick sound (less frequently as it slows down)
+      if (window.SoundManager && currentIndex % Math.max(1, Math.floor(delay / 50)) === 0) {
+        SoundManager.play('modeSpinTick');
+      }
+    }
+    
+    requestAnimationFrame(tick);
+  }
+  
+  lastTickTime = Date.now();
+  requestAnimationFrame(tick);
+}
+
+/**
+ * Get display name for a mode
+ */
+function getModeDisplayName(mode) {
+  switch (mode) {
+    case 'FLASHBACK': return 'FLASHBACK LASH';
+    case 'WORD_LASH': return 'WORD LASH';
+    case 'ACRO_LASH': return 'ACRO LASH';
+    default: return 'THE LAST WIT';
+  }
+}
+
+/**
+ * Show the mode introduction screen with description
+ */
+function showModeIntroScreen(mode) {
+  showScreen('modeIntro');
+  
+  const titleEl = document.getElementById('mode-intro-title');
+  const descEl = document.getElementById('mode-intro-description');
+  const exampleEl = document.getElementById('mode-intro-example');
+  
+  // Set mode-specific content
+  switch (mode) {
+    case 'FLASHBACK':
+      titleEl.textContent = 'FLASHBACK LASH';
+      titleEl.className = 'phase-title mode-intro-title mode-flashback';
+      descEl.textContent = 'Complete the story setup with your funniest ending!';
+      exampleEl.innerHTML = `
+        <span class="example-label">EXAMPLE SETUP:</span>
+        <span class="example-text">"I was at my wedding when suddenly..."</span>
+      `;
+      break;
+    case 'WORD_LASH':
+      titleEl.textContent = 'WORD LASH';
+      titleEl.className = 'phase-title mode-intro-title mode-word';
+      descEl.textContent = 'Create a phrase where each word starts with the given letters!';
+      exampleEl.innerHTML = `
+        <span class="example-label">EXAMPLE:</span>
+        <span class="example-text">T. F. N. = "Totally Fake News"</span>
+      `;
+      break;
+    case 'ACRO_LASH':
+      titleEl.textContent = 'ACRO LASH';
+      titleEl.className = 'phase-title mode-intro-title mode-acro';
+      descEl.textContent = 'What does this acronym stand for? Each letter starts a word!';
+      exampleEl.innerHTML = `
+        <span class="example-label">EXAMPLE:</span>
+        <span class="example-text">L. O. L. = "Llamas On Ladders"</span>
+      `;
+      break;
+  }
+}
+
+// Continue Last Wit button handler
+document.getElementById('continue-last-wit-btn')?.addEventListener('click', () => {
+  if (roomCode) {
+    socket.emit('continue_last_wit', { roomCode });
   }
 });
 

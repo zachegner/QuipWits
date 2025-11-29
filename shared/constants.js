@@ -54,7 +54,8 @@ const CLIENT_EVENTS = {
   EXTEND_TIME: 'extend_time',
   END_GAME: 'end_game',
   REJOIN: 'rejoin',
-  REJOIN_HOST: 'rejoin_host'
+  REJOIN_HOST: 'rejoin_host',
+  CONTINUE_LAST_WIT: 'continue_last_wit'
 };
 
 // Socket Events - Server to Client
@@ -69,6 +70,7 @@ const SERVER_EVENTS = {
   VOTE_MATCHUP: 'vote_matchup',
   MATCHUP_RESULT: 'matchup_result',
   ROUND_SCORES: 'round_scores',
+  LAST_WIT_MODE_REVEAL: 'last_wit_mode_reveal',
   LAST_LASH_PHASE: 'last_lash_phase',
   LAST_LASH_PROMPT: 'last_lash_prompt',
   LAST_LASH_VOTING: 'last_lash_voting',

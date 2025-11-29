@@ -25,6 +25,8 @@ const SoundManager = {
     this.register('gameStart', 'sounds/game-start.mp3');
     this.register('roundEnd', 'sounds/round-end.mp3');
     this.register('victory', 'sounds/victory.mp3');
+    this.register('modeSpinTick', 'sounds/mode-spin-tick.mp3');
+    this.register('modeSelected', 'sounds/mode-selected.mp3');
     
     // Load saved preferences
     const savedEnabled = localStorage.getItem('soundEnabled');

@@ -340,6 +340,35 @@ async function startLastLash(roomCode) {
   // setupLastLashAsync now returns { prompt, mode, letters, instructions }
   const lastWitData = await gameLogic.setupLastLashAsync(room, room.theme);
   
+  // Store the Last Wit data for when host continues
+  room.pendingLastWitData = lastWitData;
+  
+  // First, emit mode reveal to host and players for animation
+  io.to(room.hostSocketId).emit(SERVER_EVENTS.LAST_WIT_MODE_REVEAL, {
+    mode: lastWitData.mode,
+    allModes: ['FLASHBACK', 'WORD_LASH', 'ACRO_LASH']
+  });
+  
+  // Tell players to watch the screen
+  room.players.forEach(player => {
+    io.to(player.socketId).emit(SERVER_EVENTS.LAST_WIT_MODE_REVEAL, {
+      mode: lastWitData.mode
+    });
+  });
+  
+  // Wait for host to click continue (handled in continue_last_wit event)
+}
+
+/**
+ * Called when host clicks continue after mode reveal animation
+ */
+function continueLastLash(roomCode) {
+  const room = rooms.getRoom(roomCode);
+  if (!room || !room.pendingLastWitData) return;
+  
+  const lastWitData = room.pendingLastWitData;
+  delete room.pendingLastWitData;
+  
   // Notify host with full mode data
   io.to(room.hostSocketId).emit(SERVER_EVENTS.LAST_LASH_PHASE, {
     prompt: lastWitData.prompt,
@@ -789,6 +818,13 @@ io.on('connection', (socket) => {
     if (!room || room.hostSocketId !== socket.id) return;
     
     extendTimer(roomCode, seconds);
+  });
+  
+  socket.on(CLIENT_EVENTS.CONTINUE_LAST_WIT, ({ roomCode }) => {
+    const room = rooms.getRoom(roomCode);
+    if (!room || room.hostSocketId !== socket.id) return;
+    
+    continueLastLash(roomCode);
   });
   
   socket.on(CLIENT_EVENTS.END_GAME, ({ roomCode }) => {

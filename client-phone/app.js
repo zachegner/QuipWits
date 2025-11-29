@@ -369,6 +369,20 @@ socket.on('round_scores', () => {
   showScreen('waiting');
 });
 
+// Last Wit mode reveal - show watching message
+socket.on('last_wit_mode_reveal', () => {
+  showScreen('waiting');
+  const waitingText = document.querySelector('#waiting-screen .screen-title');
+  const waitingSubtext = document.querySelector('#waiting-screen .waiting-text');
+  
+  if (waitingText) {
+    waitingText.textContent = 'THE LAST WIT!';
+  }
+  if (waitingSubtext) {
+    waitingSubtext.textContent = 'Watch the screen for your challenge...';
+  }
+});
+
 socket.on('last_lash_phase', () => {
   // Wait for prompt
 });
