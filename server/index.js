@@ -337,17 +337,24 @@ async function startLastLash(roomCode) {
   
   rooms.updateRoomState(roomCode, GAME_STATES.LAST_LASH);
 
-  const prompt = await gameLogic.setupLastLashAsync(room, room.theme);
+  // setupLastLashAsync now returns { prompt, mode, letters, instructions }
+  const lastWitData = await gameLogic.setupLastLashAsync(room, room.theme);
   
-  // Notify host
+  // Notify host with full mode data
   io.to(room.hostSocketId).emit(SERVER_EVENTS.LAST_LASH_PHASE, {
-    prompt
+    prompt: lastWitData.prompt,
+    mode: lastWitData.mode,
+    letters: lastWitData.letters,
+    instructions: lastWitData.instructions
   });
   
-  // Send prompt to all players
+  // Send prompt to all players with mode info
   room.players.forEach(player => {
     io.to(player.socketId).emit(SERVER_EVENTS.LAST_LASH_PROMPT, {
-      prompt,
+      prompt: lastWitData.prompt,
+      mode: lastWitData.mode,
+      letters: lastWitData.letters,
+      instructions: lastWitData.instructions,
       timeLimit: CONFIG.LAST_LASH_ANSWER_TIME
     });
   });

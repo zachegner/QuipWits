@@ -4,7 +4,7 @@
  */
 
 const gameLogic = require('../../server/gameLogic');
-const { GAME_STATES, CONFIG, SCORING } = require('../../shared/constants');
+const { GAME_STATES, CONFIG, SCORING, LAST_WIT_MODES } = require('../../shared/constants');
 
 describe('Game Logic', () => {
   /**
@@ -503,11 +503,13 @@ describe('Game Logic', () => {
     });
 
     test('LL-001: setupLastLash initializes properly', () => {
-      const prompt = gameLogic.setupLastLash(room);
+      const result = gameLogic.setupLastLash(room);
 
-      expect(prompt).toBeDefined();
-      expect(typeof prompt).toBe('string');
-      expect(room.lastLashPrompt).toBe(prompt);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      expect(result.prompt).toBeDefined();
+      expect(typeof result.prompt).toBe('string');
+      expect(room.lastLashPrompt).toBe(result.prompt);
       expect(room.lastLashAnswers).toEqual([]);
       expect(room.lastLashVotes).toBeInstanceOf(Map);
     });
@@ -697,6 +699,110 @@ describe('Game Logic', () => {
       const result = gameLogic.submitLastLashVotes(room, 'player_0', 'player_1');
       expect(result.success).toBe(true);
       expect(room.lastLashVotes.get('player_0')).toBe('player_1');
+    });
+
+    test('LL-014: setupLastLash returns object with mode', () => {
+      const result = gameLogic.setupLastLash(room);
+      
+      expect(typeof result).toBe('object');
+      expect(result.prompt).toBeDefined();
+      expect(result.mode).toBeDefined();
+      expect(Object.values(LAST_WIT_MODES)).toContain(result.mode);
+      expect(result.instructions).toBeDefined();
+    });
+
+    test('LL-015: setupLastLash includes letters for Word Lash', () => {
+      // Run multiple times to hit Word Lash mode
+      let wordLashResult = null;
+      for (let i = 0; i < 30; i++) {
+        const result = gameLogic.setupLastLash(room);
+        if (result.mode === LAST_WIT_MODES.WORD_LASH) {
+          wordLashResult = result;
+          break;
+        }
+      }
+      
+      if (wordLashResult) {
+        expect(wordLashResult.letters).toBeDefined();
+        expect(wordLashResult.letters.length).toBe(3);
+      }
+    });
+
+    test('LL-016: setupLastLash includes letters for Acro Lash', () => {
+      // Run multiple times to hit Acro Lash mode
+      let acroLashResult = null;
+      for (let i = 0; i < 30; i++) {
+        const result = gameLogic.setupLastLash(room);
+        if (result.mode === LAST_WIT_MODES.ACRO_LASH) {
+          acroLashResult = result;
+          break;
+        }
+      }
+      
+      if (acroLashResult) {
+        expect(acroLashResult.letters).toBeDefined();
+        expect(acroLashResult.letters.length).toBeGreaterThanOrEqual(3);
+        expect(acroLashResult.letters.length).toBeLessThanOrEqual(5);
+      }
+    });
+
+    test('LL-017: getLastLashVotingData includes mode info', () => {
+      gameLogic.setupLastLash(room);
+      room.players.forEach((player, i) => {
+        gameLogic.submitLastLashAnswer(room, player.id, `Answer ${i}`);
+      });
+
+      const votingData = gameLogic.getLastLashVotingData(room);
+
+      expect(votingData.mode).toBeDefined();
+      expect(Object.values(LAST_WIT_MODES)).toContain(votingData.mode);
+    });
+
+    test('LL-018: calculateLastLashScores includes mode info', () => {
+      gameLogic.setupLastLash(room);
+      room.players.forEach(player => {
+        gameLogic.submitLastLashAnswer(room, player.id, 'Answer');
+      });
+
+      gameLogic.submitLastLashVotes(room, 'player_0', 'player_1');
+      gameLogic.submitLastLashVotes(room, 'player_1', 'player_2');
+      gameLogic.submitLastLashVotes(room, 'player_2', 'player_1');
+      gameLogic.submitLastLashVotes(room, 'player_3', 'player_1');
+
+      const results = gameLogic.calculateLastLashScores(room);
+
+      expect(results.mode).toBeDefined();
+      expect(Object.values(LAST_WIT_MODES)).toContain(results.mode);
+    });
+
+    test('LL-019: submitLastLashAnswer accepts Word Lash with soft validation', () => {
+      // Force room to Word Lash mode by setting it manually
+      room.lastLashMode = LAST_WIT_MODES.WORD_LASH;
+      room.lastLashLetters = 'TFN';
+      room.lastLashPrompt = 'Create a phrase: T.F.N.';
+      room.lastLashAnswers = [];
+      room.lastLashVotes = new Map();
+
+      // Submit answer that doesn't match letters (soft validation should still accept)
+      const result = gameLogic.submitLastLashAnswer(room, 'player_0', 'Wrong Answer Here');
+
+      expect(result.success).toBe(true);
+      expect(room.lastLashAnswers.length).toBe(1);
+    });
+
+    test('LL-020: submitLastLashAnswer accepts Acro Lash with soft validation', () => {
+      // Force room to Acro Lash mode
+      room.lastLashMode = LAST_WIT_MODES.ACRO_LASH;
+      room.lastLashLetters = 'LOL';
+      room.lastLashPrompt = 'What does LOL stand for?';
+      room.lastLashAnswers = [];
+      room.lastLashVotes = new Map();
+
+      // Submit answer that doesn't match letters (soft validation should still accept)
+      const result = gameLogic.submitLastLashAnswer(room, 'player_0', 'Wrong Answer');
+
+      expect(result.success).toBe(true);
+      expect(room.lastLashAnswers.length).toBe(1);
     });
   });
 

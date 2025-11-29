@@ -12,6 +12,8 @@ let currentGameState = 'LOBBY';
 let gameTheme = null;
 let aiEnabled = false;
 let joinUrl = null;
+let lastWitMode = null;
+let lastWitLetters = null;
 
 // DOM Elements
 const screens = {
@@ -616,7 +618,64 @@ socket.on('round_scores', (data) => {
 
 socket.on('last_lash_phase', (data) => {
   showScreen('lastLash');
-  document.getElementById('last-lash-prompt').textContent = data.prompt;
+  
+  // Store mode info
+  lastWitMode = data.mode || 'FLASHBACK';
+  lastWitLetters = data.letters || null;
+  
+  // Update title based on mode
+  const titleEl = document.getElementById('last-lash-mode-title');
+  const subtitleEl = document.getElementById('last-lash-subtitle');
+  const promptEl = document.getElementById('last-lash-prompt');
+  
+  // Set mode-specific title and styling
+  if (titleEl) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        titleEl.textContent = 'FLASHBACK LASH';
+        titleEl.className = 'phase-title last-lash-title mode-flashback';
+        break;
+      case 'WORD_LASH':
+        titleEl.textContent = 'WORD LASH';
+        titleEl.className = 'phase-title last-lash-title mode-word';
+        break;
+      case 'ACRO_LASH':
+        titleEl.textContent = 'ACRO LASH';
+        titleEl.className = 'phase-title last-lash-title mode-acro';
+        break;
+      default:
+        titleEl.textContent = 'THE LAST WIT';
+        titleEl.className = 'phase-title last-lash-title';
+    }
+  }
+  
+  // Set mode-specific subtitle
+  if (subtitleEl) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        subtitleEl.textContent = 'Complete the story!';
+        break;
+      case 'WORD_LASH':
+        subtitleEl.textContent = 'Create a phrase using these starting letters!';
+        break;
+      case 'ACRO_LASH':
+        subtitleEl.textContent = 'What does this acronym stand for?';
+        break;
+      default:
+        subtitleEl.textContent = 'Everyone answers the same prompt!';
+    }
+  }
+  
+  // Display the prompt (letters for WORD_LASH/ACRO_LASH, story for FLASHBACK)
+  if (promptEl) {
+    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+      // Display letters prominently
+      promptEl.innerHTML = `<span class="last-wit-letters">${lastWitLetters.join('. ')}.</span>`;
+    } else {
+      promptEl.textContent = data.prompt;
+    }
+  }
+  
   document.getElementById('last-lash-submissions').innerHTML = '';
   
   // Play dramatic fanfare for Last Wit
@@ -627,7 +686,38 @@ socket.on('last_lash_phase', (data) => {
 
 socket.on('last_lash_voting', (data) => {
   showScreen('lastLashVoting');
-  document.getElementById('ll-vote-prompt').textContent = data.prompt;
+  
+  // Update mode from voting data
+  lastWitMode = data.mode || lastWitMode || 'FLASHBACK';
+  lastWitLetters = data.letters || lastWitLetters;
+  
+  // Update voting screen title based on mode
+  const voteTitleEl = document.getElementById('ll-voting-title');
+  if (voteTitleEl) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        voteTitleEl.textContent = 'FLASHBACK LASH - VOTE!';
+        break;
+      case 'WORD_LASH':
+        voteTitleEl.textContent = 'WORD LASH - VOTE!';
+        break;
+      case 'ACRO_LASH':
+        voteTitleEl.textContent = 'ACRO LASH - VOTE!';
+        break;
+      default:
+        voteTitleEl.textContent = 'PICK YOUR FAVORITE!';
+    }
+  }
+  
+  // Display prompt/letters
+  const votePromptEl = document.getElementById('ll-vote-prompt');
+  if (votePromptEl) {
+    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+      votePromptEl.innerHTML = `<span class="last-wit-letters">${lastWitLetters.join('. ')}.</span>`;
+    } else {
+      votePromptEl.textContent = data.prompt;
+    }
+  }
   
   const answersContainer = document.getElementById('ll-answers');
   answersContainer.innerHTML = data.answers.map((a, i) => `
@@ -640,17 +730,54 @@ socket.on('last_lash_voting', (data) => {
 socket.on('last_lash_results', (data) => {
   showScreen('lastLashResults');
   
+  // Update mode from results data
+  lastWitMode = data.mode || lastWitMode || 'FLASHBACK';
+  
+  // Update results title based on mode
+  const resultsTitleEl = document.getElementById('ll-results-title');
+  if (resultsTitleEl) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        resultsTitleEl.textContent = 'FLASHBACK LASH RESULTS';
+        break;
+      case 'WORD_LASH':
+        resultsTitleEl.textContent = 'WORD LASH RESULTS';
+        break;
+      case 'ACRO_LASH':
+        resultsTitleEl.textContent = 'ACRO LASH RESULTS';
+        break;
+      default:
+        resultsTitleEl.textContent = 'LAST WIT RESULTS';
+    }
+  }
+  
   const resultsContainer = document.getElementById('ll-results');
-  resultsContainer.innerHTML = data.answers.map((a, index) => `
+  resultsContainer.innerHTML = data.answers.map((a, index) => {
+    // Use styled rank indicators instead of emojis
+    let rankClass = '';
+    let rankText = index + 1;
+    if (index === 0) {
+      rankClass = 'rank-gold';
+      rankText = '1ST';
+    } else if (index === 1) {
+      rankClass = 'rank-silver';
+      rankText = '2ND';
+    } else if (index === 2) {
+      rankClass = 'rank-bronze';
+      rankText = '3RD';
+    }
+    
+    return `
     <div class="ll-result-row" style="animation-delay: ${index * 0.2}s">
-      <div class="ll-result-rank">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}</div>
+      <div class="ll-result-rank ${rankClass}">${rankText}</div>
       <div class="ll-result-content">
         <div class="ll-result-answer">"${a.answer}"</div>
         <div class="ll-result-player">- ${a.playerName}</div>
       </div>
       <div class="ll-result-points">+${a.points}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 });
 
 socket.on('game_over', (data) => {

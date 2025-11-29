@@ -1,9 +1,10 @@
 /**
  * Unit Tests for Prompt Generator (server/promptGenerator.js)
- * Tests: Template processing, unique generation, fill words
+ * Tests: Template processing, unique generation, fill words, Last Wit modes
  */
 
 const promptGenerator = require('../../server/promptGenerator');
+const { LAST_WIT_MODES } = require('../../shared/constants');
 
 describe('Prompt Generator', () => {
   describe('Template Loading', () => {
@@ -250,6 +251,216 @@ describe('Prompt Generator', () => {
 
     test('getPromptsNeededForRound with 0 prompts per player', () => {
       expect(promptGenerator.getPromptsNeededForRound(4, 0)).toBe(0);
+    });
+  });
+
+  describe('Last Wit Modes', () => {
+    describe('Mode Selection', () => {
+      test('LW-001: selectRandomLastWitMode returns valid mode', () => {
+        const mode = promptGenerator.selectRandomLastWitMode();
+        
+        expect(Object.values(LAST_WIT_MODES)).toContain(mode);
+      });
+
+      test('LW-002: selectRandomLastWitMode returns different modes over time', () => {
+        const modes = new Set();
+        
+        // Run multiple times to check randomness
+        for (let i = 0; i < 50; i++) {
+          modes.add(promptGenerator.selectRandomLastWitMode());
+        }
+        
+        // Should have hit at least 2 different modes
+        expect(modes.size).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+    describe('Flashback Lash', () => {
+      test('LW-003: generateFlashbackPrompt returns story setup', () => {
+        const result = promptGenerator.generateFlashbackPrompt();
+        
+        expect(typeof result).toBe('object');
+        expect(result.prompt).toBeDefined();
+        expect(typeof result.prompt).toBe('string');
+        expect(result.prompt.length).toBeGreaterThan(0);
+        // Flashback prompts should be narrative setups (ending with ... or similar)
+        expect(result.prompt).toMatch(/\.\.\.$/);
+        expect(result.mode).toBe(LAST_WIT_MODES.FLASHBACK);
+      });
+
+      test('LW-004: generateFlashbackPrompt returns unique prompts', () => {
+        const usedPrompts = new Set();
+        const prompts = [];
+        
+        for (let i = 0; i < 10; i++) {
+          const result = promptGenerator.generateFlashbackPrompt(usedPrompts);
+          prompts.push(result.prompt);
+          usedPrompts.add(result.prompt);
+        }
+        
+        // All should be unique
+        expect(new Set(prompts).size).toBe(10);
+      });
+    });
+
+    describe('Word Lash', () => {
+      test('LW-005: generateWordLashPrompt returns exactly 3 letters', () => {
+        const result = promptGenerator.generateWordLashPrompt();
+        
+        expect(result.letters).toBeDefined();
+        expect(Array.isArray(result.letters)).toBe(true);
+        expect(result.letters.length).toBe(3);
+        result.letters.forEach(letter => {
+          expect(letter).toMatch(/^[A-Z]$/);
+        });
+      });
+
+      test('LW-006: generateWordLashPrompt has correct prompt format', () => {
+        const result = promptGenerator.generateWordLashPrompt();
+        
+        // Letters array should appear in prompt (joined with '. ')
+        expect(result.prompt).toContain(result.letters.join('. '));
+        expect(result.mode).toBe(LAST_WIT_MODES.WORD_LASH);
+        expect(result.instructions).toBeDefined();
+      });
+
+      test('LW-007: generateWordLashPrompt returns different letters', () => {
+        const letterSets = new Set();
+        
+        for (let i = 0; i < 20; i++) {
+          const result = promptGenerator.generateWordLashPrompt();
+          letterSets.add(result.letters.join(''));
+        }
+        
+        // Should have variation
+        expect(letterSets.size).toBeGreaterThan(1);
+      });
+    });
+
+    describe('Acro Lash', () => {
+      test('LW-008: generateAcroLashPrompt returns 3-5 letters', () => {
+        const lengths = new Set();
+        
+        for (let i = 0; i < 30; i++) {
+          const result = promptGenerator.generateAcroLashPrompt();
+          expect(Array.isArray(result.letters)).toBe(true);
+          expect(result.letters.length).toBeGreaterThanOrEqual(3);
+          expect(result.letters.length).toBeLessThanOrEqual(5);
+          lengths.add(result.letters.length);
+        }
+        
+        // Should hit different lengths
+        expect(lengths.size).toBeGreaterThan(1);
+      });
+
+      test('LW-009: generateAcroLashPrompt has correct format', () => {
+        const result = promptGenerator.generateAcroLashPrompt();
+        
+        result.letters.forEach(letter => {
+          expect(letter).toMatch(/^[A-Z]$/);
+        });
+        expect(result.prompt).toContain(result.letters.join('. '));
+        expect(result.mode).toBe(LAST_WIT_MODES.ACRO_LASH);
+        expect(result.instructions).toBeDefined();
+      });
+    });
+
+    describe('Last Wit Prompt Generation', () => {
+      test('LW-010: generateLastWitPrompt returns object with mode', () => {
+        const usedPrompts = new Set();
+        const result = promptGenerator.generateLastWitPrompt(usedPrompts);
+        
+        expect(result.mode).toBeDefined();
+        expect(Object.values(LAST_WIT_MODES)).toContain(result.mode);
+        expect(result.prompt).toBeDefined();
+        expect(typeof result.prompt).toBe('string');
+      });
+
+      test('LW-011: generateLastWitPrompt includes letters for word/acro modes', () => {
+        // Generate multiple to hit different modes
+        for (let i = 0; i < 30; i++) {
+          const result = promptGenerator.generateLastWitPrompt(new Set());
+          
+          if (result.mode === LAST_WIT_MODES.WORD_LASH || result.mode === LAST_WIT_MODES.ACRO_LASH) {
+            expect(result.letters).toBeDefined();
+            expect(result.letters.length).toBeGreaterThanOrEqual(3);
+          }
+        }
+      });
+
+      test('LW-012: generateLastWitPrompt includes instructions', () => {
+        const result = promptGenerator.generateLastWitPrompt(new Set());
+        
+        expect(result.instructions).toBeDefined();
+        expect(typeof result.instructions).toBe('string');
+        expect(result.instructions.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe('Answer Validation', () => {
+      test('LW-013: validateWordLashAnswer passes correct answers', () => {
+        const result = promptGenerator.validateWordLashAnswer('Take Flight Now', ['T', 'F', 'N']);
+        
+        expect(result.valid).toBe(true);
+        expect(result.message).toBeNull();
+      });
+
+      test('LW-014: validateWordLashAnswer is case-insensitive', () => {
+        const result = promptGenerator.validateWordLashAnswer('take flight now', ['T', 'F', 'N']);
+        
+        expect(result.valid).toBe(true);
+        expect(result.message).toBeNull();
+      });
+
+      test('LW-015: validateWordLashAnswer rejects wrong letters', () => {
+        const result = promptGenerator.validateWordLashAnswer('Wrong Answer Here', ['T', 'F', 'N']);
+        
+        expect(result.valid).toBe(false);
+        expect(result.message).not.toBeNull();
+      });
+
+      test('LW-016: validateWordLashAnswer handles empty answer', () => {
+        const result = promptGenerator.validateWordLashAnswer('', ['T', 'F', 'N']);
+        
+        expect(result.valid).toBe(true);
+        expect(result.message).toBeNull();
+      });
+
+      test('LW-017: validateAcroLashAnswer passes correct answers', () => {
+        const result = promptGenerator.validateAcroLashAnswer('Laughing Out Loud', 'LOL');
+        
+        expect(result.valid).toBe(true);
+        expect(result.message).toBeNull();
+      });
+
+      test('LW-018: validateAcroLashAnswer is case-insensitive', () => {
+        const result = promptGenerator.validateAcroLashAnswer('laughing out loud', 'LOL');
+        
+        expect(result.valid).toBe(true);
+        expect(result.message).toBeNull();
+      });
+
+      test('LW-019: validateAcroLashAnswer rejects wrong letters', () => {
+        const result = promptGenerator.validateAcroLashAnswer('Wrong Answer Here', 'LOL');
+        
+        expect(result.valid).toBe(false);
+        expect(result.message).not.toBeNull();
+      });
+
+      test('LW-020: validateAcroLashAnswer requires enough words', () => {
+        const result = promptGenerator.validateAcroLashAnswer('Only Two', 'LOL');
+        
+        expect(result.valid).toBe(false);
+        expect(result.message).not.toBeNull();
+        expect(result.message).toMatch(/3 words/);
+      });
+
+      test('LW-021: validateAcroLashAnswer handles longer acronyms', () => {
+        const result = promptGenerator.validateAcroLashAnswer('Super Cool Really Amazing Words', 'SCRAW');
+        
+        expect(result.valid).toBe(true);
+        expect(result.message).toBeNull();
+      });
     });
   });
 });

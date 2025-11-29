@@ -1,5 +1,15 @@
-const { CONFIG, SCORING, GAME_STATES } = require('../shared/constants');
-const { generateUniquePrompts, generateUniquePromptsAsync, generateLastLashPrompt, generateLastLashPromptAsync, getPromptsNeededForRound } = require('./promptGenerator');
+const { CONFIG, SCORING, GAME_STATES, LAST_WIT_MODES } = require('../shared/constants');
+const { 
+  generateUniquePrompts, 
+  generateUniquePromptsAsync, 
+  generateLastLashPrompt, 
+  generateLastLashPromptAsync, 
+  getPromptsNeededForRound,
+  generateLastWitPrompt,
+  generateLastWitPromptAsync,
+  validateWordLashAnswer,
+  validateAcroLashAnswer
+} = require('./promptGenerator');
 
 /**
  * Assign prompts to players for a round
@@ -405,14 +415,21 @@ function getScoreboard(room) {
 }
 
 /**
- * Setup Last Wit round
+ * Setup Last Wit round with randomly selected mode
+ * Modes: FLASHBACK (complete the story), WORD_LASH (phrase from letters), ACRO_LASH (expand acronym)
  */
 function setupLastLash(room) {
   if (!room.usedPrompts) {
     room.usedPrompts = new Set();
   }
   
-  room.lastLashPrompt = generateLastLashPrompt(room.usedPrompts);
+  // Generate Last Wit prompt with random mode selection
+  const lastWitData = generateLastWitPrompt(room.usedPrompts);
+  
+  room.lastLashPrompt = lastWitData.prompt;
+  room.lastLashMode = lastWitData.mode;
+  room.lastLashLetters = lastWitData.letters || null;
+  room.lastLashInstructions = lastWitData.instructions || null;
   room.lastLashAnswers = [];
   room.lastLashVotes = new Map();
   
@@ -421,7 +438,12 @@ function setupLastLash(room) {
     p.hasVoted = new Set();
   });
   
-  return room.lastLashPrompt;
+  return {
+    prompt: room.lastLashPrompt,
+    mode: room.lastLashMode,
+    letters: room.lastLashLetters,
+    instructions: room.lastLashInstructions
+  };
 }
 
 /**
@@ -434,7 +456,13 @@ async function setupLastLashAsync(room, theme = null) {
     room.usedPrompts = new Set();
   }
   
-  room.lastLashPrompt = await generateLastLashPromptAsync(room.usedPrompts, true, theme);
+  // Generate Last Wit prompt with random mode selection and AI support
+  const lastWitData = await generateLastWitPromptAsync(room.usedPrompts, true, theme);
+  
+  room.lastLashPrompt = lastWitData.prompt;
+  room.lastLashMode = lastWitData.mode;
+  room.lastLashLetters = lastWitData.letters || null;
+  room.lastLashInstructions = lastWitData.instructions || null;
   room.lastLashAnswers = [];
   room.lastLashVotes = new Map();
   
@@ -443,11 +471,17 @@ async function setupLastLashAsync(room, theme = null) {
     p.hasVoted = new Set();
   });
   
-  return room.lastLashPrompt;
+  return {
+    prompt: room.lastLashPrompt,
+    mode: room.lastLashMode,
+    letters: room.lastLashLetters,
+    instructions: room.lastLashInstructions
+  };
 }
 
 /**
- * Submit Last Wit answer
+ * Submit Last Wit answer with mode-specific soft validation
+ * For WORD_LASH and ACRO_LASH, validates letter matching (case-insensitive)
  */
 function submitLastLashAnswer(room, playerId, answerText) {
   // Check if already submitted
@@ -457,13 +491,29 @@ function submitLastLashAnswer(room, playerId, answerText) {
   
   const trimmedAnswer = answerText.trim().substring(0, CONFIG.MAX_ANSWER_LENGTH);
   
+  // Soft validation for letter-based modes (warning only, still accepts answer)
+  let validationWarning = null;
+  
+  if (room.lastLashMode === LAST_WIT_MODES.WORD_LASH && room.lastLashLetters) {
+    const validation = validateWordLashAnswer(trimmedAnswer, room.lastLashLetters);
+    if (!validation.valid) {
+      validationWarning = validation.message;
+    }
+  } else if (room.lastLashMode === LAST_WIT_MODES.ACRO_LASH && room.lastLashLetters) {
+    const validation = validateAcroLashAnswer(trimmedAnswer, room.lastLashLetters);
+    if (!validation.valid) {
+      validationWarning = validation.message;
+    }
+  }
+  
   room.lastLashAnswers.push({
     playerId,
     answer: trimmedAnswer || '[No answer]',
-    points: 0
+    points: 0,
+    validationWarning
   });
   
-  return { success: true };
+  return { success: true, warning: validationWarning };
 }
 
 /**
@@ -490,6 +540,7 @@ function autoSubmitMissingLastLashAnswers(room) {
 
 /**
  * Get Last Wit answers for voting (shuffled, anonymized)
+ * Includes mode information for display
  */
 function getLastLashVotingData(room) {
   // Shuffle answers
@@ -501,6 +552,9 @@ function getLastLashVotingData(room) {
   
   return {
     prompt: room.lastLashPrompt,
+    mode: room.lastLashMode,
+    letters: room.lastLashLetters,
+    instructions: room.lastLashInstructions,
     answers: shuffled.map((a, index) => ({
       index,
       playerId: a.playerId,  // Server-side reference
@@ -543,6 +597,7 @@ function allLastLashVotesSubmitted(room) {
 
 /**
  * Calculate Last Wit scores (official Quiplash style - points based on votes received)
+ * Includes mode information for results display
  */
 function calculateLastLashScores(room) {
   // Count votes for each player
@@ -588,6 +643,8 @@ function calculateLastLashScores(room) {
   
   return {
     prompt: room.lastLashPrompt,
+    mode: room.lastLashMode,
+    letters: room.lastLashLetters,
     answers: sortedAnswers.map(a => ({
       playerName: room.players.find(p => p.id === a.playerId)?.name || 'Unknown',
       answer: a.answer,

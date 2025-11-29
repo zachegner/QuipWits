@@ -231,5 +231,33 @@
       "coworker", "best friend's spouse", "childhood bully", "crush",
       "grandmother", "godparent", "pet psychic", "financial advisor"
     ]
-  }
+  },
+  "flashbackSetups": [
+    "The museum tour was going smoothly until the guide whispered, 'Whatever you do, do not stare directly at the statue's eyes.' Then...",
+    "Everyone at the wedding froze when the best man stood up and said, 'Before I give my toast, there's something you all need to know.' Then...",
+    "The job interview was going great until the interviewer leaned in and asked, 'Can you keep a secret?' Then...",
+    "The family reunion was peaceful until Grandma opened her mysterious locked box and revealed...",
+    "The escape room was supposed to be fun until the door actually locked and the lights went out. Then...",
+    "The cooking class instructor smiled nervously and said, 'Whatever happens, don't open the oven.' Then...",
+    "The fortune teller's eyes went wide. She dropped my hand and whispered, 'You need to leave. Now.' Then...",
+    "My blind date was going perfectly until they looked at their phone and said, 'We have exactly three minutes.' Then...",
+    "The tour guide stopped the bus in the middle of nowhere and said, 'This is where it happened.' Then...",
+    "The pilot came on the intercom and said, 'Ladies and gentlemen, I need to be honest with you.' Then...",
+    "The dentist put down their tools, took off their mask, and said, 'We need to talk about what I found.' Then...",
+    "My new roommate seemed normal until I came home early and found them...",
+    "The self-driving car announced, 'Route recalculated. Final destination updated.' Then...",
+    "Grandpa's last words were cryptic: 'The treasure is hidden where...'",
+    "The tech support call was routine until the agent said, 'Sir, your webcam has been on this whole time.' Then...",
+    "The dinner party took a dark turn when the host clinked their glass and announced...",
+    "The Uber driver locked the doors and said, 'I know what you did last summer.' Then...",
+    "The therapy session was going well until my therapist started crying and said...",
+    "My DNA test results came back, and the letter simply said...",
+    "The magician's trick went wrong when the rabbit actually...",
+    "The yoga instructor stopped mid-pose and whispered, 'Nobody move. It's behind you.' Then...",
+    "The airplane bathroom door wouldn't open, and a voice from inside said...",
+    "My smart home assistant suddenly announced at 3am...",
+    "The company all-hands meeting went silent when the CEO revealed...",
+    "The haunted house actor broke character and screamed, 'That's not one of us!' Then..."
+  ],
+  "acroLashLetters": "ABCDEFGHIJKLMNOPRSTUVW"
 }

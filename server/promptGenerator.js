@@ -10,6 +10,9 @@ const Anthropic = require('@anthropic-ai/sdk').default;
 // Config module for API key management
 const config = require('./config');
 
+// Import Last Wit modes
+const { LAST_WIT_MODES } = require('../shared/constants');
+
 // Helper to get the base path for assets (works with pkg bundled apps)
 function getBasePath() {
   // When bundled with pkg, __dirname points to snapshot filesystem
@@ -412,6 +415,297 @@ function isAIAvailable() {
   return !!(config.getAnthropicApiKey() || process.env.ANTHROPIC_API_KEY);
 }
 
+/**
+ * Randomly select a Last Wit mode
+ * @returns {string} One of LAST_WIT_MODES values
+ */
+function selectRandomLastWitMode() {
+  const modes = Object.values(LAST_WIT_MODES);
+  return modes[Math.floor(Math.random() * modes.length)];
+}
+
+/**
+ * Generate a Flashback Lash prompt (story completion)
+ * A short story setup with a missing final line
+ * @param {Set} usedPrompts - Set of already used prompt strings
+ * @param {string|null} theme - Optional theme for themed generation
+ * @returns {object} { prompt: string, mode: 'FLASHBACK' }
+ */
+function generateFlashbackPrompt(usedPrompts = new Set(), theme = null) {
+  const setups = promptData.flashbackSetups || [];
+  
+  // Filter out already used setups
+  const available = setups.filter(s => !usedPrompts.has(s));
+  const pool = available.length > 0 ? available : setups;
+  
+  // Select random setup
+  const setup = pool[Math.floor(Math.random() * pool.length)];
+  usedPrompts.add(setup);
+  
+  return {
+    prompt: setup,
+    mode: LAST_WIT_MODES.FLASHBACK,
+    instructions: 'Complete the story'
+  };
+}
+
+/**
+ * Generate a Flashback Lash prompt with AI (story completion)
+ * @param {Set} usedPrompts - Set of already used prompt strings
+ * @param {string|null} theme - Optional theme for themed generation
+ * @returns {Promise<object>} { prompt: string, mode: 'FLASHBACK' }
+ */
+async function generateFlashbackPromptAsync(usedPrompts = new Set(), theme = null) {
+  const client = getAnthropicClient();
+  
+  if (client && theme) {
+    try {
+      console.log(`Generating themed Flashback Lash prompt for theme: "${theme}"`);
+      
+      const message = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        messages: [
+          {
+            role: 'user',
+            content: `Generate ONE Flashback Lash prompt for the theme "${theme}". 
+This is a short story setup where players complete the final line.
+The story should end with "Then..." so players write what happens next.
+Make it specific to the "${theme}" universe - use characters, locations, or situations from it.
+Keep it under 200 characters. Return ONLY the story setup, nothing else.
+
+Example format: "The [character] was [doing something] when [something unexpected happened]. Then..."`
+          }
+        ],
+        system: 'You are a comedy writer creating Flashback Lash prompts for a party game. Create engaging story setups that end on a cliffhanger with "Then..." for players to complete. Be creative and tie into the given theme authentically.'
+      });
+      
+      const prompt = message.content[0].text.trim();
+      if (prompt && !usedPrompts.has(prompt)) {
+        usedPrompts.add(prompt);
+        return {
+          prompt,
+          mode: LAST_WIT_MODES.FLASHBACK,
+          instructions: 'Complete the story'
+        };
+      }
+    } catch (error) {
+      console.error('AI Flashback generation failed:', error.message);
+    }
+  }
+  
+  // Fallback to local templates
+  return generateFlashbackPrompt(usedPrompts, theme);
+}
+
+/**
+ * Generate a Word Lash prompt (starting letters)
+ * Players create a phrase using given starting letters (e.g., T. F. N.)
+ * @param {Set} usedPrompts - Set of already used prompts
+ * @param {string|null} theme - Optional theme
+ * @returns {object} { prompt: string, letters: string, mode: 'WORD_LASH' }
+ */
+function generateWordLashPrompt(usedPrompts = new Set(), theme = null) {
+  const letterPool = promptData.acroLashLetters || 'ABCDEFGHIJKLMNOPRSTUVW';
+  
+  // Generate 3 random letters
+  const letters = [];
+  const usedLetters = new Set();
+  
+  while (letters.length < 3) {
+    const letter = letterPool[Math.floor(Math.random() * letterPool.length)];
+    // Allow some repeats but not consecutive
+    if (letters.length === 0 || letters[letters.length - 1] !== letter) {
+      letters.push(letter);
+    }
+  }
+  
+  const letterString = letters.join('. ') + '.';
+  const promptKey = `WORD_LASH:${letterString}`;
+  
+  // Try to avoid reused letter combinations
+  if (usedPrompts.has(promptKey)) {
+    // Just regenerate once - duplicates are acceptable
+    return generateWordLashPrompt(usedPrompts, theme);
+  }
+  
+  usedPrompts.add(promptKey);
+  
+  return {
+    prompt: letterString,
+    letters: letters,
+    mode: LAST_WIT_MODES.WORD_LASH,
+    instructions: 'Create a phrase where each word starts with these letters'
+  };
+}
+
+/**
+ * Generate an Acro Lash prompt (acronym expansion)
+ * Players expand a random acronym (3-5 letters)
+ * @param {Set} usedPrompts - Set of already used prompts
+ * @param {string|null} theme - Optional theme
+ * @returns {object} { prompt: string, letters: string[], letterCount: number, mode: 'ACRO_LASH' }
+ */
+function generateAcroLashPrompt(usedPrompts = new Set(), theme = null) {
+  const letterPool = promptData.acroLashLetters || 'ABCDEFGHIJKLMNOPRSTUVW';
+  
+  // Random length between 3-5 letters
+  const letterCount = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
+  
+  const letters = [];
+  while (letters.length < letterCount) {
+    const letter = letterPool[Math.floor(Math.random() * letterPool.length)];
+    // Avoid consecutive same letters
+    if (letters.length === 0 || letters[letters.length - 1] !== letter) {
+      letters.push(letter);
+    }
+  }
+  
+  const letterString = letters.join('. ') + '.';
+  const promptKey = `ACRO_LASH:${letterString}`;
+  
+  // Try to avoid reused combinations
+  if (usedPrompts.has(promptKey)) {
+    return generateAcroLashPrompt(usedPrompts, theme);
+  }
+  
+  usedPrompts.add(promptKey);
+  
+  return {
+    prompt: letterString,
+    letters: letters,
+    letterCount: letterCount,
+    mode: LAST_WIT_MODES.ACRO_LASH,
+    instructions: 'Create an acronym where each letter starts a word'
+  };
+}
+
+/**
+ * Generate Last Wit prompt based on randomly selected mode
+ * @param {Set} usedPrompts - Set of already used prompts
+ * @param {string|null} theme - Optional theme
+ * @returns {object} Mode-specific prompt object
+ */
+function generateLastWitPrompt(usedPrompts = new Set(), theme = null) {
+  const mode = selectRandomLastWitMode();
+  
+  switch (mode) {
+    case LAST_WIT_MODES.FLASHBACK:
+      return generateFlashbackPrompt(usedPrompts, theme);
+    case LAST_WIT_MODES.WORD_LASH:
+      return generateWordLashPrompt(usedPrompts, theme);
+    case LAST_WIT_MODES.ACRO_LASH:
+      return generateAcroLashPrompt(usedPrompts, theme);
+    default:
+      return generateFlashbackPrompt(usedPrompts, theme);
+  }
+}
+
+/**
+ * Generate Last Wit prompt based on randomly selected mode (async with AI support)
+ * @param {Set} usedPrompts - Set of already used prompts
+ * @param {boolean} useAI - Whether to use AI generation
+ * @param {string|null} theme - Optional theme
+ * @returns {Promise<object>} Mode-specific prompt object
+ */
+async function generateLastWitPromptAsync(usedPrompts = new Set(), useAI = true, theme = null) {
+  const mode = selectRandomLastWitMode();
+  
+  switch (mode) {
+    case LAST_WIT_MODES.FLASHBACK:
+      if (useAI && getAnthropicClient()) {
+        return generateFlashbackPromptAsync(usedPrompts, theme);
+      }
+      return generateFlashbackPrompt(usedPrompts, theme);
+    case LAST_WIT_MODES.WORD_LASH:
+      // Word Lash is just random letters, no AI needed
+      return generateWordLashPrompt(usedPrompts, theme);
+    case LAST_WIT_MODES.ACRO_LASH:
+      // Acro Lash is just random letters, no AI needed
+      return generateAcroLashPrompt(usedPrompts, theme);
+    default:
+      return generateFlashbackPrompt(usedPrompts, theme);
+  }
+}
+
+/**
+ * Validate a Word Lash answer (soft validation, case-insensitive)
+ * @param {string} answer - The player's answer
+ * @param {string[]} letters - The required starting letters
+ * @returns {object} { valid: boolean, message: string|null }
+ */
+function validateWordLashAnswer(answer, letters) {
+  if (!answer || !letters || letters.length === 0) {
+    return { valid: true, message: null };
+  }
+  
+  const words = answer.trim().split(/\s+/);
+  
+  if (words.length < letters.length) {
+    return { 
+      valid: false, 
+      message: `Need at least ${letters.length} words starting with ${letters.join(', ')}`
+    };
+  }
+  
+  // Check first N words match the letters (case-insensitive)
+  for (let i = 0; i < letters.length; i++) {
+    const word = words[i] || '';
+    const expectedLetter = letters[i].toLowerCase();
+    const actualLetter = word.charAt(0).toLowerCase();
+    
+    if (actualLetter !== expectedLetter) {
+      return {
+        valid: false,
+        message: `Word ${i + 1} should start with "${letters[i]}"`
+      };
+    }
+  }
+  
+  return { valid: true, message: null };
+}
+
+/**
+ * Validate an Acro Lash answer (soft validation, case-insensitive)
+ * @param {string} answer - The player's answer
+ * @param {string[]} letters - The required starting letters
+ * @returns {object} { valid: boolean, message: string|null }
+ */
+function validateAcroLashAnswer(answer, letters) {
+  if (!answer || !letters || letters.length === 0) {
+    return { valid: true, message: null };
+  }
+  
+  // letters is a string like "LOL", convert to array for processing
+  const lettersArray = typeof letters === 'string' ? letters.split('') : letters;
+  
+  const words = answer.trim().split(/\s+/);
+  
+  // Acro Lash requires exact word count matching letters
+  if (words.length !== lettersArray.length) {
+    return {
+      valid: false,
+      message: `Need exactly ${lettersArray.length} words for ${lettersArray.join('.')}.`
+    };
+  }
+  
+  // Check each word starts with corresponding letter (case-insensitive)
+  for (let i = 0; i < lettersArray.length; i++) {
+    const word = words[i] || '';
+    const expectedLetter = lettersArray[i].toLowerCase();
+    const actualLetter = word.charAt(0).toLowerCase();
+    
+    if (actualLetter !== expectedLetter) {
+      return {
+        valid: false,
+        message: `Word ${i + 1} should start with "${lettersArray[i]}"`
+      };
+    }
+  }
+  
+  return { valid: true, message: null };
+}
+
 module.exports = {
   generatePrompt,
   generateUniquePrompts,
@@ -423,5 +717,15 @@ module.exports = {
   getPromptsNeededForRound,
   isAIAvailable,
   reinitializeClient,
-  promptData
+  promptData,
+  // Last Wit mode functions
+  selectRandomLastWitMode,
+  generateFlashbackPrompt,
+  generateFlashbackPromptAsync,
+  generateWordLashPrompt,
+  generateAcroLashPrompt,
+  generateLastWitPrompt,
+  generateLastWitPromptAsync,
+  validateWordLashAnswer,
+  validateAcroLashAnswer
 };

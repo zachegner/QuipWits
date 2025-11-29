@@ -96,6 +96,63 @@ input, textarea, select {
   animation: pulse 1s ease infinite;
 }
 
+/* Last Wit Mode-specific title styles */
+.screen-title.last-lash.mode-flashback {
+  color: var(--neon-purple);
+  text-shadow: 0 0 10px var(--neon-purple);
+}
+
+.screen-title.last-lash.mode-word {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px var(--neon-cyan);
+}
+
+.screen-title.last-lash.mode-acro {
+  color: var(--neon-pink);
+  text-shadow: 0 0 10px var(--neon-pink);
+}
+
+/* Letter display for Word Lash and Acro Lash */
+.last-wit-letters {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 2rem;
+  letter-spacing: 0.4em;
+  color: var(--neon-cyan);
+  text-shadow: 
+    0 0 10px var(--neon-cyan),
+    0 0 20px var(--neon-cyan);
+  display: block;
+  text-align: center;
+}
+
+.last-wit-letters-small {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 1.2rem;
+  letter-spacing: 0.3em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px var(--neon-cyan);
+  display: block;
+  text-align: center;
+}
+
+/* Instructions for Last Wit modes */
+.ll-instructions {
+  font-size: 0.9rem;
+  color: var(--text-gray);
+  text-align: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+/* Single selection style for voting */
+.ll-option.selected {
+  border-color: var(--neon-yellow);
+  box-shadow: 0 0 15px var(--neon-yellow);
+  background: rgba(255, 255, 0, 0.1);
+}
+
 .screen-title.error {
   color: var(--error-red);
   text-shadow: 0 0 10px var(--error-red);

@@ -141,6 +141,18 @@ PORT=3000
 - **Reconnection**: Players can rejoin if they disconnect
 - **Score Tracking**: Full scoreboard with round-by-round points
 
+### The Last Wit Final Round
+
+The game concludes with **The Last Wit** - a high-stakes final round where everyone answers the same prompt! Each game randomly selects one of three exciting modes:
+
+| Mode | Description | Example |
+|------|-------------|---------|
+| **Flashback Lash** | Complete a story setup | "I was at my wedding when suddenly..." |
+| **Word Lash** | Create a phrase from starting letters | "T. F. N." → "Totally Fake News" |
+| **Acro Lash** | Expand an acronym (3-5 letters) | "L. O. L." → "Llamas On Ladders" |
+
+The Last Wit is worth **double points** - a chance for underdogs to steal the victory!
+
 ---
 
 ## Requirements

@@ -9,6 +9,8 @@ let currentPrompts = [];
 let currentPromptIndex = 0;
 let currentMatchup = null;
 let lastLashVotes = [];
+let lastWitMode = null;
+let lastWitLetters = null;
 
 // DOM Elements
 const screens = {
@@ -372,9 +374,90 @@ socket.on('last_lash_phase', () => {
 });
 
 socket.on('last_lash_prompt', (data) => {
-  document.getElementById('ll-prompt').textContent = data.prompt;
+  // Store mode info
+  lastWitMode = data.mode || 'FLASHBACK';
+  lastWitLetters = data.letters || null;
+  
+  // Update title based on mode
+  const titleEl = document.getElementById('ll-mode-title');
+  const instructionsEl = document.getElementById('ll-instructions');
+  const promptEl = document.getElementById('ll-prompt');
+  const placeholderText = document.getElementById('ll-answer-input');
+  
+  if (titleEl) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        titleEl.textContent = 'FLASHBACK LASH';
+        titleEl.className = 'screen-title last-lash mode-flashback';
+        break;
+      case 'WORD_LASH':
+        titleEl.textContent = 'WORD LASH';
+        titleEl.className = 'screen-title last-lash mode-word';
+        break;
+      case 'ACRO_LASH':
+        titleEl.textContent = 'ACRO LASH';
+        titleEl.className = 'screen-title last-lash mode-acro';
+        break;
+      default:
+        titleEl.textContent = 'THE LAST WIT';
+        titleEl.className = 'screen-title last-lash';
+    }
+  }
+  
+  // Set mode-specific instructions
+  if (instructionsEl) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        instructionsEl.textContent = 'Complete the story!';
+        break;
+      case 'WORD_LASH':
+        instructionsEl.textContent = 'Create a phrase where each word starts with these letters';
+        break;
+      case 'ACRO_LASH':
+        instructionsEl.textContent = 'What does this acronym stand for?';
+        break;
+      default:
+        instructionsEl.textContent = 'Make it your best!';
+    }
+    instructionsEl.style.display = 'block';
+  }
+  
+  // Set placeholder text based on mode
+  if (placeholderText) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        placeholderText.placeholder = 'What happens next...';
+        break;
+      case 'WORD_LASH':
+        placeholderText.placeholder = lastWitLetters ? `${lastWitLetters.join(' ')} ...` : 'Your phrase...';
+        break;
+      case 'ACRO_LASH':
+        placeholderText.placeholder = lastWitLetters ? `${lastWitLetters.length} words starting with ${lastWitLetters.join(', ')}` : 'Expand the acronym...';
+        break;
+      default:
+        placeholderText.placeholder = 'Make it your best!';
+    }
+  }
+  
+  // Display prompt (letters for WORD_LASH/ACRO_LASH, story for FLASHBACK)
+  if (promptEl) {
+    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+      promptEl.innerHTML = `<span class="last-wit-letters">${lastWitLetters.join('. ')}.</span>`;
+    } else {
+      promptEl.textContent = data.prompt;
+    }
+  }
+  
   document.getElementById('ll-answer-input').value = '';
   document.getElementById('ll-char-count').textContent = '0';
+  
+  // Reset submit button
+  const btn = document.getElementById('ll-submit-btn');
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'SUBMIT';
+  }
+  
   showScreen('lastLash');
 });
 
@@ -384,7 +467,37 @@ let requiredVotes = 1;
 socket.on('last_lash_voting', (data) => {
   lastLashVotes = [];
   
-  document.getElementById('ll-vote-prompt').textContent = data.prompt;
+  // Update mode from voting data
+  lastWitMode = data.mode || lastWitMode || 'FLASHBACK';
+  lastWitLetters = data.letters || lastWitLetters;
+  
+  // Update voting title based on mode
+  const voteTitleEl = document.getElementById('ll-vote-title');
+  if (voteTitleEl) {
+    switch (lastWitMode) {
+      case 'FLASHBACK':
+        voteTitleEl.textContent = 'FLASHBACK - VOTE!';
+        break;
+      case 'WORD_LASH':
+        voteTitleEl.textContent = 'WORD LASH - VOTE!';
+        break;
+      case 'ACRO_LASH':
+        voteTitleEl.textContent = 'ACRO LASH - VOTE!';
+        break;
+      default:
+        voteTitleEl.textContent = 'PICK YOUR FAVORITE!';
+    }
+  }
+  
+  // Display prompt/letters
+  const votePromptEl = document.getElementById('ll-vote-prompt');
+  if (votePromptEl) {
+    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+      votePromptEl.innerHTML = `<span class="last-wit-letters-small">${lastWitLetters.join('. ')}.</span>`;
+    } else {
+      votePromptEl.textContent = data.prompt;
+    }
+  }
   
   const optionsContainer = document.getElementById('ll-vote-options');
   

@@ -781,6 +781,77 @@ body {
   animation: lastLashPulse 2s ease infinite;
 }
 
+/* Last Wit Mode-specific styles */
+.last-lash-title.mode-flashback {
+  color: var(--neon-purple) !important;
+  text-shadow: 
+    0 0 10px var(--neon-purple),
+    0 0 20px var(--neon-purple),
+    0 0 40px var(--neon-pink) !important;
+}
+
+.last-lash-title.mode-word {
+  color: var(--neon-cyan) !important;
+  text-shadow: 
+    0 0 10px var(--neon-cyan),
+    0 0 20px var(--neon-cyan),
+    0 0 40px var(--neon-pink) !important;
+}
+
+.last-lash-title.mode-acro {
+  color: var(--neon-pink) !important;
+  text-shadow: 
+    0 0 10px var(--neon-pink),
+    0 0 20px var(--neon-pink),
+    0 0 40px var(--neon-yellow) !important;
+}
+
+/* Large letter display for Word Lash and Acro Lash */
+.last-wit-letters {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 4rem;
+  letter-spacing: 0.5em;
+  color: var(--neon-cyan);
+  text-shadow: 
+    0 0 20px var(--neon-cyan),
+    0 0 40px var(--neon-cyan),
+    0 0 60px var(--neon-pink);
+  display: block;
+  text-align: center;
+  animation: letterPulse 1.5s ease infinite;
+}
+
+@keyframes letterPulse {
+  0%, 100% { 
+    text-shadow: 
+      0 0 20px var(--neon-cyan),
+      0 0 40px var(--neon-cyan),
+      0 0 60px var(--neon-pink);
+  }
+  50% { 
+    text-shadow: 
+      0 0 30px var(--neon-cyan),
+      0 0 60px var(--neon-cyan),
+      0 0 100px var(--neon-pink);
+  }
+}
+
+/* Rank indicators for Last Wit results (no emojis) */
+.ll-result-rank.rank-gold {
+  color: gold;
+  text-shadow: 0 0 15px gold;
+}
+
+.ll-result-rank.rank-silver {
+  color: silver;
+  text-shadow: 0 0 10px silver;
+}
+
+.ll-result-rank.rank-bronze {
+  color: #cd7f32;
+  text-shadow: 0 0 10px #cd7f32;
+}
+
 @keyframes lastLashPulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }

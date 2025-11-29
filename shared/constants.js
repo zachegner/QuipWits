@@ -9,6 +9,13 @@ const GAME_STATES = {
   GAME_OVER: 'GAME_OVER'
 };
 
+// Last Wit Game Modes (randomly selected each game)
+const LAST_WIT_MODES = {
+  FLASHBACK: 'FLASHBACK',   // Complete the story ending
+  WORD_LASH: 'WORD_LASH',   // Create phrase from starting letters (e.g., T.F.N.)
+  ACRO_LASH: 'ACRO_LASH'    // Expand acronym (e.g., R.D.F. -> "Rabid Ducks Fight")
+};
+
 // Game Configuration
 const CONFIG = {
   MAX_PLAYERS: 8,
@@ -81,6 +88,7 @@ const SERVER_EVENTS = {
 
 module.exports = {
   GAME_STATES,
+  LAST_WIT_MODES,
   CONFIG,
   SCORING,
   CLIENT_EVENTS,
