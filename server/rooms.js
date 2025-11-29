@@ -39,7 +39,7 @@ function createRoom(hostSocketId, hostId) {
     matchups: [],          // Array of matchup objects for voting
     lastLashPrompt: null,
     lastLashAnswers: [],   // Array of { playerId, answer }
-    lastLashVotes: new Map(), // playerId -> [1st, 2nd, 3rd] picks
+    lastLashVotes: new Map(), // playerId -> votedForPlayerId (single vote)
     isPaused: false,
     timerEndTime: null,
     remainingTimeOnPause: null,  // Seconds remaining when paused

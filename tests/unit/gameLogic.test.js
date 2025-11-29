@@ -568,29 +568,30 @@ describe('Game Logic', () => {
       });
     });
 
-    test('LL-007: submitLastLashVotes records votes', () => {
+    test('LL-007: submitLastLashVotes records single vote', () => {
       gameLogic.setupLastLash(room);
       room.players.forEach(player => {
         gameLogic.submitLastLashAnswer(room, player.id, 'Answer');
       });
 
-      const votes = ['player_1', 'player_2', 'player_3'];
-      const result = gameLogic.submitLastLashVotes(room, 'player_0', votes);
+      // Single vote (official Quiplash rules)
+      const result = gameLogic.submitLastLashVotes(room, 'player_0', 'player_1');
 
       expect(result.success).toBe(true);
       expect(room.lastLashVotes.has('player_0')).toBe(true);
+      expect(room.lastLashVotes.get('player_0')).toBe('player_1');
     });
 
-    test('LL-008: rejects invalid vote count', () => {
+    test('LL-008: rejects voting for invalid player', () => {
       gameLogic.setupLastLash(room);
       room.players.forEach(player => {
         gameLogic.submitLastLashAnswer(room, player.id, 'Answer');
       });
 
-      const result = gameLogic.submitLastLashVotes(room, 'player_0', ['player_1']);
+      const result = gameLogic.submitLastLashVotes(room, 'player_0', 'non_existent_player');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Must pick');
+      expect(result.error).toBe('Invalid vote target');
     });
 
     test('LL-009: rejects voting for self', () => {
@@ -599,27 +600,37 @@ describe('Game Logic', () => {
         gameLogic.submitLastLashAnswer(room, player.id, 'Answer');
       });
 
-      const result = gameLogic.submitLastLashVotes(room, 'player_0', ['player_0', 'player_1', 'player_2']);
+      const result = gameLogic.submitLastLashVotes(room, 'player_0', 'player_0');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Cannot vote for your own answer');
     });
 
-    test('LL-010: calculateLastLashScores awards 300/200/100', () => {
+    test('LL-010: calculateLastLashScores awards points based on votes received', () => {
       gameLogic.setupLastLash(room);
       room.players.forEach(player => {
         gameLogic.submitLastLashAnswer(room, player.id, 'Answer');
       });
 
-      // All players vote same way
-      room.players.forEach(player => {
-        const otherPlayers = room.players.filter(p => p.id !== player.id).map(p => p.id);
-        gameLogic.submitLastLashVotes(room, player.id, otherPlayers.slice(0, 3));
-      });
+      // All players vote for player_1 (except player_1 votes for player_2)
+      gameLogic.submitLastLashVotes(room, 'player_0', 'player_1');
+      gameLogic.submitLastLashVotes(room, 'player_1', 'player_2');
+      gameLogic.submitLastLashVotes(room, 'player_2', 'player_1');
+      gameLogic.submitLastLashVotes(room, 'player_3', 'player_1');
 
       const results = gameLogic.calculateLastLashScores(room);
 
-      expect(results.answers[0].points).toBeGreaterThan(results.answers[1].points);
+      // player_1 got 3 votes, should have most points (3*100 + 300 bonus = 600)
+      const player1Result = results.answers.find(a => a.playerName === 'Player1');
+      expect(player1Result.votes).toBe(3);
+      expect(player1Result.points).toBe(600); // 3 votes * 100 + 300 winner bonus
+      expect(player1Result.isWinner).toBe(true);
+      
+      // player_2 got 1 vote (100 points, no bonus)
+      const player2Result = results.answers.find(a => a.playerName === 'Player2');
+      expect(player2Result.votes).toBe(1);
+      expect(player2Result.points).toBe(100);
+      
       expect(results.finalScoreboard).toBeDefined();
     });
 
@@ -629,17 +640,19 @@ describe('Game Logic', () => {
         gameLogic.submitLastLashAnswer(room, player.id, 'Answer');
       });
 
-      room.players.forEach(player => {
-        const otherPlayers = room.players.filter(p => p.id !== player.id).map(p => p.id);
-        gameLogic.submitLastLashVotes(room, player.id, otherPlayers.slice(0, 3));
-      });
+      // Each player votes for someone else (single vote)
+      gameLogic.submitLastLashVotes(room, 'player_0', 'player_1');
+      gameLogic.submitLastLashVotes(room, 'player_1', 'player_2');
+      gameLogic.submitLastLashVotes(room, 'player_2', 'player_3');
+      gameLogic.submitLastLashVotes(room, 'player_3', 'player_0');
 
       gameLogic.calculateLastLashScores(room);
       const scoreboard = gameLogic.getScoreboard(room);
 
-      // At least one player should have points
+      // Each player got 1 vote = 100 points + 300 winner bonus each (4-way tie for winner)
+      // Total: 4 players * (100 + 300) = 1600 points
       const totalPoints = scoreboard.reduce((sum, p) => sum + p.score, 0);
-      expect(totalPoints).toBeGreaterThan(0);
+      expect(totalPoints).toBe(1600);
     });
 
     test('LL-012: getWinners returns player with highest score', () => {
@@ -672,7 +685,7 @@ describe('Game Logic', () => {
       expect(gameLogic.allLastLashAnswersSubmitted(room)).toBe(false);
     });
 
-    test('handles Last Wit with fewer than 3 available voters', () => {
+    test('handles Last Wit with 3 players using single vote', () => {
       // Create room with exactly 3 players
       room = createTestRoom(3);
       gameLogic.setupLastLash(room);
@@ -680,9 +693,10 @@ describe('Game Logic', () => {
         gameLogic.submitLastLashAnswer(room, player.id, 'Answer');
       });
 
-      // Each player can only vote for 2 others
-      const result = gameLogic.submitLastLashVotes(room, 'player_0', ['player_1', 'player_2']);
+      // Each player casts single vote
+      const result = gameLogic.submitLastLashVotes(room, 'player_0', 'player_1');
       expect(result.success).toBe(true);
+      expect(room.lastLashVotes.get('player_0')).toBe('player_1');
     });
   });
 

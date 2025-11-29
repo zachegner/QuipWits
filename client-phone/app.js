@@ -94,6 +94,8 @@ function joinGame() {
   const code = document.getElementById('room-code-input').value.trim().toUpperCase();
   const name = document.getElementById('name-input').value.trim();
   
+  console.log('joinGame called with:', { code, name });
+  
   // Validation
   if (code.length !== 4) {
     showError('Room code must be 4 letters');
@@ -112,6 +114,8 @@ function joinGame() {
   
   showError(''); // Clear error
   
+  console.log('Socket connected:', socket.connected);
+  console.log('Emitting join_room event...');
   socket.emit('join_room', { roomCode: code, playerName: name });
 }
 
@@ -241,6 +245,7 @@ function showNextPrompt() {
 
 // Socket event handlers
 socket.on('room_joined', (data) => {
+  console.log('room_joined event received:', data);
   playerId = data.playerId;
   roomCode = data.roomCode;
   playerName = data.playerName;
@@ -373,8 +378,8 @@ socket.on('last_lash_prompt', (data) => {
   showScreen('lastLash');
 });
 
-// Track how many votes are required (min of 3 or available answers excluding own)
-let requiredVotes = 3;
+// Single vote for Last Lash (official Quiplash rules)
+let requiredVotes = 1;
 
 socket.on('last_lash_voting', (data) => {
   lastLashVotes = [];
@@ -383,15 +388,10 @@ socket.on('last_lash_voting', (data) => {
   
   const optionsContainer = document.getElementById('ll-vote-options');
   
-  // Filter out own answer and mark which ones are selectable
-  const selectableAnswers = data.answers.filter(a => a.playerId !== playerId);
-  requiredVotes = Math.min(3, selectableAnswers.length);
-  
   optionsContainer.innerHTML = data.answers.map((a, i) => {
     const isOwn = a.playerId === playerId;
     return `
     <button class="ll-option ${isOwn ? 'own-answer' : ''}" data-player-id="${a.playerId}" data-index="${i}" ${isOwn ? 'disabled' : ''}>
-      <span class="rank-badge" style="display: none;"></span>
       "${a.answer}"
       ${isOwn ? '<span class="own-label">(Your answer)</span>' : ''}
     </button>
@@ -415,31 +415,21 @@ function handleLastLashVote(btn) {
     return;
   }
   
-  // Check if already selected
-  const existingIndex = lastLashVotes.indexOf(optionPlayerId);
-  
-  if (existingIndex !== -1) {
-    // Remove from selection
-    lastLashVotes.splice(existingIndex, 1);
-  } else if (lastLashVotes.length < requiredVotes) {
-    // Add to selection
-    lastLashVotes.push(optionPlayerId);
+  // Single vote - clear previous selection and select new one
+  // Or deselect if clicking the same one
+  if (lastLashVotes.includes(optionPlayerId)) {
+    lastLashVotes = [];
+  } else {
+    lastLashVotes = [optionPlayerId];
   }
   
-  // Update UI
+  // Update UI - single selection style
   document.querySelectorAll('.ll-option').forEach(option => {
     const pid = option.dataset.playerId;
-    const voteIndex = lastLashVotes.indexOf(pid);
+    option.classList.remove('selected', 'selected-1');
     
-    option.classList.remove('selected-1', 'selected-2', 'selected-3');
-    const badge = option.querySelector('.rank-badge');
-    
-    if (voteIndex !== -1) {
-      option.classList.add(`selected-${voteIndex + 1}`);
-      badge.style.display = 'flex';
-      badge.textContent = voteIndex + 1;
-    } else {
-      badge.style.display = 'none';
+    if (lastLashVotes.includes(pid)) {
+      option.classList.add('selected');
     }
   });
   
@@ -450,11 +440,10 @@ function updateLastLashVoteButton() {
   const btn = document.getElementById('ll-vote-submit-btn');
   if (lastLashVotes.length >= requiredVotes) {
     btn.disabled = false;
-    btn.textContent = 'SUBMIT VOTES';
+    btn.textContent = 'SUBMIT VOTE';
   } else {
     btn.disabled = true;
-    const remaining = requiredVotes - lastLashVotes.length;
-    btn.textContent = `SELECT ${remaining} MORE`;
+    btn.textContent = 'SELECT YOUR FAVORITE';
   }
 }
 
@@ -509,6 +498,7 @@ socket.on('game_resumed', () => {
 });
 
 socket.on('error', (data) => {
+  console.log('error event received:', data);
   showError(data.message);
 });
 

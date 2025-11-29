@@ -53,6 +53,7 @@ async function assignPromptsToPlayersAsync(room, theme = null) {
 
 /**
  * Internal helper to assign prompts to players given prompt texts
+ * Uses a pairing algorithm that guarantees each player gets exactly promptsPerPlayer prompts
  */
 function assignPromptsToPlayersWithTexts(room, promptTexts, players, playerCount, promptsPerPlayer) {
   // Create prompt objects with IDs
@@ -76,63 +77,84 @@ function assignPromptsToPlayersWithTexts(room, promptTexts, players, playerCount
     p.hasVoted = new Set();
   });
   
-  // Assign prompts to players using slot consumption
-  // Create a list of "slots" - each player needs promptsPerPlayer slots
-  const slots = [];
+  // Build pairs using a balanced assignment algorithm
+  // Each player needs exactly promptsPerPlayer assignments
+  // Each prompt needs exactly 2 different players
+  
+  // Track how many more assignments each player needs
+  const assignmentsNeeded = new Map();
+  players.forEach(p => assignmentsNeeded.set(p.id, promptsPerPlayer));
+  
+  // Create all valid pairs (player combinations) with weights
+  // Prioritize pairing players who still need more assignments
+  for (const prompt of prompts) {
+    // Get players sorted by how many assignments they still need (most needed first)
+    const availablePlayers = players
+      .filter(p => assignmentsNeeded.get(p.id) > 0)
+      .sort((a, b) => assignmentsNeeded.get(b.id) - assignmentsNeeded.get(a.id));
+    
+    if (availablePlayers.length >= 2) {
+      // Take the two players who need the most assignments
+      // Add some randomness among players with equal need
+      const maxNeed = assignmentsNeeded.get(availablePlayers[0].id);
+      const playersWithMaxNeed = availablePlayers.filter(p => assignmentsNeeded.get(p.id) === maxNeed);
+      
+      // Shuffle players with equal need for randomness
+      for (let i = playersWithMaxNeed.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [playersWithMaxNeed[i], playersWithMaxNeed[j]] = [playersWithMaxNeed[j], playersWithMaxNeed[i]];
+      }
+      
+      let player1, player2;
+      
+      if (playersWithMaxNeed.length >= 2) {
+        // Both players from the max-need group
+        player1 = playersWithMaxNeed[0];
+        player2 = playersWithMaxNeed[1];
+      } else {
+        // First player from max-need, second from next tier
+        player1 = playersWithMaxNeed[0];
+        const otherPlayers = availablePlayers.filter(p => p.id !== player1.id);
+        // Shuffle other players for randomness
+        for (let i = otherPlayers.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [otherPlayers[i], otherPlayers[j]] = [otherPlayers[j], otherPlayers[i]];
+        }
+        player2 = otherPlayers[0];
+      }
+      
+      prompt.player1Id = player1.id;
+      prompt.player2Id = player2.id;
+      
+      // Decrement their remaining assignments needed
+      assignmentsNeeded.set(player1.id, assignmentsNeeded.get(player1.id) - 1);
+      assignmentsNeeded.set(player2.id, assignmentsNeeded.get(player2.id) - 1);
+      
+      // Update player assignments
+      player1.promptsAssigned.push(prompt.id);
+      player2.promptsAssigned.push(prompt.id);
+    } else if (availablePlayers.length === 1) {
+      // Edge case: only one player has slots left - pair with someone else
+      const player1 = availablePlayers[0];
+      const otherPlayers = players.filter(p => p.id !== player1.id);
+      const player2 = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
+      
+      prompt.player1Id = player1.id;
+      prompt.player2Id = player2.id;
+      
+      assignmentsNeeded.set(player1.id, assignmentsNeeded.get(player1.id) - 1);
+      
+      player1.promptsAssigned.push(prompt.id);
+      player2.promptsAssigned.push(prompt.id);
+    }
+  }
+  
+  // Validation: log warning if any player didn't get the expected number of prompts
   players.forEach(p => {
-    for (let i = 0; i < promptsPerPlayer; i++) {
-      slots.push(p.id);
+    if (p.promptsAssigned.length !== promptsPerPlayer) {
+      console.warn(`[PROMPT ASSIGNMENT WARNING] Player ${p.name} (${p.id}) has ${p.promptsAssigned.length} prompts instead of ${promptsPerPlayer}`);
     }
   });
-  
-  // Shuffle slots for randomness
-  for (let i = slots.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [slots[i], slots[j]] = [slots[j], slots[i]];
-  }
-  
-  // Assign players to prompts by consuming slots from the array
-  for (const prompt of prompts) {
-    // Get first player - take from front of slots
-    if (slots.length > 0) {
-      prompt.player1Id = slots.shift();
-    }
-    
-    // Find second player (must be different from first)
-    // Look for a slot with a different player ID
-    let foundIndex = -1;
-    for (let i = 0; i < slots.length; i++) {
-      if (slots[i] !== prompt.player1Id) {
-        foundIndex = i;
-        break;
-      }
-    }
-    
-    if (foundIndex !== -1) {
-      // Found a different player - remove and use that slot
-      prompt.player2Id = slots.splice(foundIndex, 1)[0];
-    } else if (slots.length > 0) {
-      // All remaining slots are same player - use anyway (shouldn't happen with proper prompt count)
-      prompt.player2Id = slots.shift();
-    }
-    
-    // Fallback if we couldn't find a second player
-    if (!prompt.player2Id) {
-      // Find any player who isn't player1
-      for (const p of players) {
-        if (p.id !== prompt.player1Id) {
-          prompt.player2Id = p.id;
-          break;
-        }
-      }
-    }
-    
-    // Update player assignments
-    const p1 = players.find(p => p.id === prompt.player1Id);
-    const p2 = players.find(p => p.id === prompt.player2Id);
-    if (p1) p1.promptsAssigned.push(prompt.id);
-    if (p2) p2.promptsAssigned.push(prompt.id);
-  }
   
   room.prompts = prompts;
   room.currentMatchupIndex = 0;
@@ -488,28 +510,27 @@ function getLastLashVotingData(room) {
 }
 
 /**
- * Submit Last Wit votes (top 3)
+ * Submit Last Wit vote (single vote per player - official Quiplash rules)
  */
 function submitLastLashVotes(room, voterId, votes) {
-  // votes = [playerId1, playerId2, playerId3] in order of preference
   if (room.lastLashVotes.has(voterId)) {
     return { success: false, error: 'Already voted' };
   }
   
-  // Calculate how many votes are required (min of 3 or available answers minus own)
-  const availableAnswers = room.lastLashAnswers.filter(a => a.playerId !== voterId).length;
-  const requiredVotes = Math.min(3, availableAnswers);
-  
-  if (!Array.isArray(votes) || votes.length < requiredVotes) {
-    return { success: false, error: `Must pick ${requiredVotes} answers` };
-  }
+  // Accept single vote (backwards compatible with array format)
+  const votedForId = Array.isArray(votes) ? votes[0] : votes;
   
   // Can't vote for your own answer
-  if (votes.includes(voterId)) {
+  if (votedForId === voterId) {
     return { success: false, error: 'Cannot vote for your own answer' };
   }
   
-  room.lastLashVotes.set(voterId, votes);
+  // Validate the voted player exists in answers
+  if (!room.lastLashAnswers.some(a => a.playerId === votedForId)) {
+    return { success: false, error: 'Invalid vote target' };
+  }
+  
+  room.lastLashVotes.set(voterId, votedForId);
   return { success: true };
 }
 
@@ -521,19 +542,39 @@ function allLastLashVotesSubmitted(room) {
 }
 
 /**
- * Calculate Last Wit scores
+ * Calculate Last Wit scores (official Quiplash style - points based on votes received)
  */
 function calculateLastLashScores(room) {
-  // Tally points: 1st = 300, 2nd = 200, 3rd = 100
-  const pointValues = [SCORING.LAST_LASH_FIRST, SCORING.LAST_LASH_SECOND, SCORING.LAST_LASH_THIRD];
+  // Count votes for each player
+  const voteCounts = new Map();
+  room.lastLashAnswers.forEach(a => voteCounts.set(a.playerId, 0));
   
-  room.lastLashVotes.forEach((votes, voterId) => {
-    votes.forEach((playerId, rank) => {
-      const answer = room.lastLashAnswers.find(a => a.playerId === playerId);
-      if (answer) {
-        answer.points += pointValues[rank];
-      }
-    });
+  room.lastLashVotes.forEach((votedForId) => {
+    const current = voteCounts.get(votedForId) || 0;
+    voteCounts.set(votedForId, current + 1);
+  });
+  
+  // Find the winner(s) - most votes
+  let maxVotes = 0;
+  voteCounts.forEach(count => {
+    if (count > maxVotes) maxVotes = count;
+  });
+  
+  // Award points based on votes received
+  // Points per vote + bonus for winner
+  const POINTS_PER_VOTE = SCORING.POINTS_PER_VOTE;  // 100 points per vote
+  const WINNER_BONUS = SCORING.LAST_LASH_FIRST;     // 300 point bonus for winner
+  
+  room.lastLashAnswers.forEach(answer => {
+    const votes = voteCounts.get(answer.playerId) || 0;
+    answer.votes = votes;
+    answer.points = votes * POINTS_PER_VOTE;
+    
+    // Winner bonus (only if they got at least one vote)
+    if (votes === maxVotes && votes > 0) {
+      answer.points += WINNER_BONUS;
+      answer.isWinner = true;
+    }
   });
   
   // Update total scores
@@ -550,7 +591,9 @@ function calculateLastLashScores(room) {
     answers: sortedAnswers.map(a => ({
       playerName: room.players.find(p => p.id === a.playerId)?.name || 'Unknown',
       answer: a.answer,
-      points: a.points
+      votes: a.votes,
+      points: a.points,
+      isWinner: a.isWinner || false
     })),
     finalScoreboard: getScoreboard(room)
   };
