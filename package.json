@@ -1,8 +1,7 @@
 {
   "name": "quipwits",
-  "version": "1.0.0",
-  "main": "server/index.js",
-  "bin": "server/index.js",
+  "version": "0.3.0-alpha",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
@@ -11,32 +10,20 @@
     "test:integration": "jest tests/integration",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
-    "build": "npm run build:win && npm run build:mac && npm run build:linux",
-    "build:win": "npx @yao-pkg/pkg . --targets node20-win-x64 --output dist/QuipWits-Windows.exe",
-    "build:mac": "npx @yao-pkg/pkg . --targets node20-macos-x64 --output dist/QuipWits-macOS",
-    "build:linux": "npx @yao-pkg/pkg . --targets node20-linux-x64 --output dist/QuipWits-Linux"
-  },
-  "pkg": {
-    "scripts": [
-      "server/**/*.js",
-      "shared/**/*.js"
-    ],
-    "assets": [
-      "client-host/**/*",
-      "client-phone/**/*",
-      "shared/**/*",
-      "prompts/**/*"
-    ],
-    "targets": [
-      "node20-win-x64",
-      "node20-macos-x64"
-    ],
-    "outputPath": "dist"
+    "electron:dev": "electron .",
+    "build": "electron-builder --config electron-builder.config.js -mwl",
+    "build:mac": "electron-builder --config electron-builder.config.js --mac",
+    "build:win": "electron-builder --config electron-builder.config.js --win",
+    "build:linux": "electron-builder --config electron-builder.config.js --linux",
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [],
-  "author": "",
+  "author": {
+    "name": "zachegner",
+    "email": "zachegner@users.noreply.github.com"
+  },
   "license": "ISC",
-  "description": "QuipWits party game",
+  "description": "QuipWits party game - A party game where clever answers compete",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
     "cors": "^2.8.5",
@@ -45,7 +32,8 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.10.1",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
     "jest": "^30.2.0",
     "nodemon": "^3.1.11",
     "socket.io-client": "^4.8.1"
