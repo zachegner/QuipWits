@@ -93,16 +93,27 @@ async function setupJoinUrl() {
     joinUrl = `${window.location.origin}/play`;
   }
   
+  // Update URL with room code if available
+  updateJoinUrl();
+  
+  return joinUrl;
+}
+
+// Update join URL and QR code with current room code
+function updateJoinUrl() {
+  let urlToDisplay = joinUrl;
+  if (roomCode) {
+    urlToDisplay = `${joinUrl}?code=${roomCode}`;
+  }
+  
   // Update URL displays
   const joinUrlEl = document.getElementById('join-url');
   const setupJoinUrlEl = document.getElementById('setup-join-url');
-  if (joinUrlEl) joinUrlEl.textContent = joinUrl;
-  if (setupJoinUrlEl) setupJoinUrlEl.textContent = joinUrl;
+  if (joinUrlEl) joinUrlEl.textContent = urlToDisplay;
+  if (setupJoinUrlEl) setupJoinUrlEl.textContent = urlToDisplay;
   
-  // Generate QR code
-  generateQRCode(joinUrl);
-  
-  return joinUrl;
+  // Generate QR code with room code
+  generateQRCode(urlToDisplay);
 }
 
 // API Key Management
@@ -362,6 +373,8 @@ socket.on('room_created', (data) => {
   document.getElementById('room-code').textContent = roomCode;
   saveSession();
   console.log('Room created:', roomCode);
+  // Update QR code and join URL with room code
+  updateJoinUrl();
 });
 
 // Handle successful host rejoin
@@ -374,6 +387,8 @@ socket.on('rejoin_host_success', (data) => {
   
   document.getElementById('room-code').textContent = roomCode;
   saveSession();
+  // Update QR code and join URL with room code
+  updateJoinUrl();
   
   // Restore UI based on game state
   updatePlayerList();

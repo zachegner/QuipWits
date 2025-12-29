@@ -36,6 +36,21 @@ function showScreen(screenName) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+  // Check for room code in URL query parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const codeFromUrl = urlParams.get('code');
+  if (codeFromUrl) {
+    const roomCodeInput = document.getElementById('room-code-input');
+    if (roomCodeInput) {
+      roomCodeInput.value = codeFromUrl.toUpperCase();
+      // Focus on name input since room code is already filled
+      const nameInput = document.getElementById('name-input');
+      if (nameInput) {
+        nameInput.focus();
+      }
+    }
+  }
+  
   // Check for reconnection
   if (playerId && roomCode) {
     socket.emit('rejoin', { playerId, roomCode });

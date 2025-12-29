@@ -1,6 +1,6 @@
 {
   "name": "quipwits",
-  "version": "0.3.0-alpha",
+  "version": "0.4.0",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server/index.js",
@@ -10,6 +10,12 @@
     "test:integration": "jest tests/integration",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
+    "test:script:normal": "node tests/scripts/normal-game.js",
+    "test:script:jinx": "node tests/scripts/jinx-game.js",
+    "test:script:quipwit": "node tests/scripts/quipwit-game.js",
+    "test:script:timeout": "node tests/scripts/timeout-game.js",
+    "test:script:tie": "node tests/scripts/tie-game.js",
+    "test:script:decisive": "node tests/scripts/decisive-win-game.js",
     "electron:dev": "electron .",
     "build": "electron-builder --config electron-builder.config.js -mwl",
     "build:mac": "electron-builder --config electron-builder.config.js --mac",

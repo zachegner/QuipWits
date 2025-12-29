@@ -97,35 +97,42 @@ function getAISystemPrompt(theme = null) {
     return AI_SYSTEM_PROMPT_BASE;
   }
   
-  // When a theme is provided, build a completely theme-focused prompt
-  return `You are a hilarious comedy writer for a QuipLash-style party game. Your job is to generate funny, creative fill-in-the-blank style prompts that are DEEPLY ROOTED in the theme: "${theme}"
+  // When a theme is provided, build a theme-focused prompt that's simple and accessible
+  // Handle both media franchises and general topics/concepts
+  return `You are a hilarious comedy writer for a QuipLash-style party game. Your job is to generate funny, creative fill-in-the-blank style prompts inspired by the theme: "${theme}"
 
-THEME-FIRST APPROACH:
-- Every prompt MUST authentically reference the theme's universe, characters, storylines, catchphrases, running jokes, or iconic moments
-- Think like a superfan of "${theme}" - use specific references that fans would recognize and appreciate
-- The humor should come FROM the theme itself, not generic situations with theme names inserted
-- Reference specific characters, locations, episodes, quotes, relationships, and inside jokes from "${theme}"
-- Capture the tone and humor style that "${theme}" is known for
+SIMPLICITY FIRST:
+- Prompts must be IMMEDIATELY understandable - players should "get it" on first read
+- Use well-known characters, concepts, or situations from "${theme}" that casual fans would recognize
+- Keep it simple and clear - avoid obscure references, deep lore, or complex storylines
+- The humor should be straightforward and funny, not requiring deep theme knowledge
+- Think "recognizable" not "superfan-only" - prompts should work for both fans and casual viewers
+- If "${theme}" is a general topic (not a media franchise), create prompts that playfully reference the topic in fun, accessible ways
 
 Guidelines:
 - Prompts should be open-ended enough for creative, hilarious answers
 - Format: A statement or question that players complete with their answer
 - Keep prompts concise (under 100 characters ideally)
-- Make them funny, surprising, and authentically connected to "${theme}"
+- Make them funny, surprising, and connected to "${theme}" in a way that's easy to understand
+- Prioritize clarity and immediate comprehension over deep references
+- ALWAYS generate actual prompts - never explain why you can't or refuse. Create fun, appropriate prompts.
 
-Examples of GOOD themed prompts (theme-authentic):
-- For "The Office": "What Michael Scott wrote in his diary after the Dundies"
-- For "Star Wars": "Yoda's rejected wisdom that didn't make the Jedi training manual"
-- For "Family Guy": "The cutaway gag Peter Griffin had right before getting fired"
-- For "Harry Potter": "The spell Dumbledore banned after one too many accidents"
-- For "Marvel": "What Thor actually calls his hammer when no one's listening"
+Examples of GOOD themed prompts (simple and accessible):
+- For "The Office": "What Michael Scott would name his autobiography"
+- For "Star Wars": "The worst thing to say to Darth Vader"
+- For "Family Guy": "Peter Griffin's worst idea ever"
+- For "Harry Potter": "The worst spell to cast by accident"
+- For "Marvel": "What Captain America writes in his diary"
+- For "cooking": "The worst thing to say to a chef"
+- For "sports": "What a coach yells when they're really frustrated"
 
-Examples of BAD themed prompts (generic with names inserted):
+Examples of BAD themed prompts (too complicated or generic):
+- "What Michael Scott wrote in his diary after the Dundies" (requires knowing what Dundies are)
+- "Yoda's rejected wisdom that didn't make the Jedi training manual" (too complex)
 - "What [character] does on a first date" (too generic)
 - "[Character]'s embarrassing work moment" (doesn't use theme's actual context)
-- "A pickup line [character] would use" (not theme-specific humor)
 
-Generate prompts that would make fans of "${theme}" laugh because they GET the reference. Be specific, be authentic, be hilarious.`;
+Generate prompts that are fun, funny, and instantly understandable. Keep them simple and accessible while still being connected to "${theme}". Always return actual prompts, never explanations or refusals.`;
 }
 
 /**
@@ -150,13 +157,151 @@ function generatePrompt(template, fillWords) {
 }
 
 /**
+ * Check if a prompt is actually a valid prompt or if it's an AI refusal/explanation
+ * @param {string} prompt - The prompt to validate
+ * @param {string|null} theme - Optional theme to check relevance against
+ * @returns {boolean} True if it's a valid prompt, false if it's a refusal/explanation
+ */
+function isValidPrompt(prompt, theme = null) {
+  if (!prompt || prompt.length < 10) return false;
+  
+  // Check for common refusal/explanation patterns
+  const refusalPatterns = [
+    /I (appreciate|need|must|cannot|can't|should)/i,
+    /I (respectfully|politely) (decline|refuse)/i,
+    /doesn't have (characters|storylines|episodes|universe)/i,
+    /isn't (a|an) (media|franchise|show|movie|book)/i,
+    /rather than (a|an)/i,
+    /To create (genuine|authentic)/i,
+    /I would need/i,
+    /I'm (not|unable)/i,
+    /I (cannot|can't) (generate|create)/i,
+    /the theme.*doesn't have/i,
+    /biological term/i,
+    /entertainment property/i,
+    /established (lore|fan culture)/i,
+    /following your (excellent )?guidelines/i,
+    /would need an actual/i,
+    /- Established/i,  // Bullet points in explanations
+    /- Specific/i,
+    /- Reference/i
+  ];
+  
+  // If it matches refusal patterns, it's not a valid prompt
+  for (const pattern of refusalPatterns) {
+    if (pattern.test(prompt)) {
+      return false;
+    }
+  }
+  
+  // Valid prompts should be questions or statements that can be completed
+  // They shouldn't be too long (explanations are usually long)
+  if (prompt.length > 200) return false;
+  
+  // Should look like a fill-in-the-blank prompt
+  // Check if it's a question or statement that makes sense as a prompt
+  const validPromptPatterns = [
+    /^(What|Why|How|When|Where|Who|The|A|An|Your|My|Their|His|Her|This|That|If|The worst|The best|The most|The least|Something|Nothing|Anything)/i,
+    /'s (worst|best|most|least|first|last)/i,
+    /would (say|do|think|write|name|call|tell|ask)/i,
+    /should (say|do|think|write|name|call)/i,
+    /could (say|do|think|write|name|call)/i
+  ];
+  
+  // If it doesn't match any valid prompt patterns, it might be an explanation
+  const hasValidPattern = validPromptPatterns.some(pattern => pattern.test(prompt));
+  
+  if (!hasValidPattern) return false;
+  
+  // If theme is provided, do a light relevance check
+  // We're lenient here - the AI and sanitization handle appropriateness
+  // This just catches completely unrelated prompts
+  if (theme) {
+    const themeLower = theme.toLowerCase();
+    const promptLower = prompt.toLowerCase();
+    
+    // Check if theme words appear in prompt (flexible matching)
+    const themeWords = themeLower.split(/\s+/).filter(w => w.length > 2); // Only check words longer than 2 chars
+    const hasThemeReference = themeWords.length > 0 && themeWords.some(word => {
+      // Check if theme word appears in prompt (but not as part of another word)
+      const wordRegex = new RegExp(`\\b${word}\\w*\\b`, 'i');
+      return wordRegex.test(promptLower);
+    });
+    
+    // For single-word themes, be lenient - only reject if it's clearly completely unrelated
+    // Since we have sanitization, we trust the AI to generate appropriate content
+    // Only reject if it's a very specific single word and the prompt has no connection
+    if (themeWords.length === 1 && !hasThemeReference) {
+      // Be very lenient - only reject if the prompt is clearly generic/unrelated
+      // Most themes will work fine even without explicit word matches
+      // (e.g., "space" theme could have prompts about astronauts, planets, etc.)
+      return true; // Allow through - trust the AI's judgment
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Sanitize a theme by getting an appropriate alternative that maintains the original intent
+ * @param {string} originalTheme - The original theme that was deemed inappropriate
+ * @returns {Promise<string|null>} An appropriate alternative theme, or null if sanitization fails
+ */
+async function sanitizeTheme(originalTheme) {
+  const client = getAnthropicClient();
+  if (!client) {
+    return null;
+  }
+
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 128,
+      messages: [
+        {
+          role: 'user',
+          content: `The theme "${originalTheme}" is not appropriate for generating party game prompts. Suggest a more appropriate, family-friendly alternative theme that captures the same general concept or category. 
+
+For example:
+- "penis" → "anatomy" or "biology" or "health"
+- "sex" → "dating" or "relationships"
+- "drugs" → "medicine" or "pharmacy"
+
+Return ONLY the alternative theme (1-3 words), nothing else.`
+        }
+      ],
+      system: 'You are a helpful assistant that suggests appropriate alternative themes for party games while maintaining the original concept.'
+    });
+
+    const sanitized = message.content[0].text.trim();
+    // Clean up any extra text
+    const lines = sanitized.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const result = lines[0] || sanitized;
+    
+    // Remove quotes if present
+    const cleanResult = result.replace(/^["']|["']$/g, '').trim();
+    
+    if (cleanResult && cleanResult.length > 0 && cleanResult.length < 50) {
+      console.log(`Sanitized theme: "${originalTheme}" → "${cleanResult}"`);
+      return cleanResult;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Theme sanitization failed:', error.message);
+    return null;
+  }
+}
+
+/**
  * Generate prompts using Claude AI
  * @param {number} count - Number of prompts to generate
  * @param {Set} usedPrompts - Set of already used prompt strings to avoid
  * @param {string|null} theme - Optional theme for themed prompt generation
+ * @param {string|null} originalTheme - The original theme if this is a sanitized attempt
  * @returns {Promise<Array>} Array of AI-generated prompt strings
  */
-async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = null) {
+async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = null, originalTheme = null) {
   const client = getAnthropicClient();
   if (!client) {
     throw new Error('Anthropic client not initialized - check ANTHROPIC_API_KEY');
@@ -168,7 +313,7 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
     : '';
   
   const themeContext = theme 
-    ? `\n\nCRITICAL: Focus on authentic "${theme}" content - specific characters, storylines, quotes, and references that fans would recognize. Do NOT create generic prompts with theme names inserted. Every prompt should feel like it belongs in the "${theme}" universe.`
+    ? `\n\nIMPORTANT: Create prompts inspired by "${theme}" that are simple and immediately understandable. Use well-known characters or concepts that casual fans would recognize. Prioritize clarity and accessibility - players should understand the prompt on first read without needing deep theme knowledge. Always generate actual prompts, never explanations or refusals.`
     : '';
 
   const message = await client.messages.create({
@@ -185,13 +330,40 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
 
   // Parse response - each line is a prompt
   const responseText = message.content[0].text;
-  const prompts = responseText
+  const allLines = responseText
     .split('\n')
     .map(line => line.trim())
-    .filter(line => line.length > 0 && !line.match(/^\d+[\.\)]/)) // Remove empty lines and numbering
-    .slice(0, count); // Ensure we don't return more than requested
-
-  return prompts;
+    .filter(line => line.length > 0 && !line.match(/^\d+[\.\)]/)); // Remove empty lines and numbering
+  
+  // Filter out AI refusals/explanations and keep only valid prompts
+  const validPrompts = allLines.filter(line => isValidPrompt(line, theme));
+  
+  // If we got valid prompts, return them (up to count)
+  if (validPrompts.length > 0) {
+    return validPrompts.slice(0, count);
+  }
+  
+  // If all prompts were invalid (AI refused), try sanitizing the theme
+  if (validPrompts.length === 0 && theme && !originalTheme) {
+    console.warn(`AI returned no valid prompts for theme "${theme}". Attempting to sanitize theme...`);
+    const sanitizedTheme = await sanitizeTheme(theme);
+    
+    if (sanitizedTheme && sanitizedTheme !== theme) {
+      console.log(`Retrying with sanitized theme: "${sanitizedTheme}"`);
+      // Retry with sanitized theme, marking originalTheme to prevent infinite loops
+      return generatePromptsWithAI(count, usedPrompts, sanitizedTheme, theme);
+    }
+  }
+  
+  // If still no valid prompts (or sanitization failed), return empty array
+  // This will trigger fallback to local templates
+  if (validPrompts.length === 0) {
+    // Show the theme we actually tried (sanitized if applicable)
+    const displayTheme = originalTheme ? `${originalTheme} (sanitized to "${theme}")` : theme;
+    console.warn(`AI returned no valid prompts for theme "${displayTheme}". Falling back to local templates.`);
+  }
+  
+  return validPrompts;
 }
 
 /**
