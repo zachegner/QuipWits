@@ -111,8 +111,6 @@ function joinGame() {
   const code = document.getElementById('room-code-input').value.trim().toUpperCase();
   const name = document.getElementById('name-input').value.trim();
   
-  console.log('joinGame called with:', { code, name });
-  
   // Validation
   if (code.length !== 4) {
     showError('Room code must be 4 letters');
@@ -131,8 +129,6 @@ function joinGame() {
   
   showError(''); // Clear error
   
-  console.log('Socket connected:', socket.connected);
-  console.log('Emitting join_room event...');
   socket.emit('join_room', { roomCode: code, playerName: name });
 }
 
@@ -262,7 +258,6 @@ function showNextPrompt() {
 
 // Socket event handlers
 socket.on('room_joined', (data) => {
-  console.log('room_joined event received:', data);
   playerId = data.playerId;
   roomCode = data.roomCode;
   playerName = data.playerName;
@@ -301,7 +296,7 @@ socket.on('game_started', () => {
 
 socket.on('receive_prompts', (data) => {
   currentPrompts = data.prompts;
-  currentPromptIndex = 0;
+  currentPromptIndex = data.resumeAtIndex ?? 0;
   showNextPrompt();
 });
 
@@ -631,28 +626,26 @@ socket.on('timer_update', (data) => {
 
 socket.on('game_paused', () => {
   document.getElementById('pause-overlay').classList.add('active');
-  console.log('Game paused');
 });
 
 socket.on('game_resumed', () => {
   document.getElementById('pause-overlay').classList.remove('active');
-  console.log('Game resumed');
+});
+
+socket.on('answer_failed', (data) => {
+  const btn = document.getElementById('submit-answer-btn');
+  btn.disabled = false;
+  btn.textContent = 'SUBMIT';
+  showError(data.error || 'Failed to submit answer. Please try again.');
 });
 
 socket.on('error', (data) => {
-  console.log('error event received:', data);
   showError(data.message);
 });
 
 socket.on('connect', () => {
-  console.log('Connected to server');
-  
   // Try to rejoin if we have saved data
   if (playerId && roomCode && screens.join.classList.contains('active') === false) {
     socket.emit('rejoin', { playerId, roomCode });
   }
-});
-
-socket.on('disconnect', () => {
-  console.log('Disconnected from server');
 });
