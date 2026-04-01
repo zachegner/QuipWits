@@ -185,6 +185,25 @@ function getPlayerPrompts(room, playerId) {
 }
 
 /**
+ * Return the index of the first prompt this player has not yet answered.
+ * Returns the list length if all prompts have been answered, which causes
+ * the client to show the waiting screen instead of a prompt.
+ */
+function getPlayerPromptResumeIndex(room, playerId) {
+  const playerPrompts = room.prompts.filter(p =>
+    p.player1Id === playerId || p.player2Id === playerId
+  );
+  for (let i = 0; i < playerPrompts.length; i++) {
+    const p = playerPrompts[i];
+    const alreadyAnswered = p.player1Id === playerId
+      ? p.player1Answer !== null
+      : p.player2Answer !== null;
+    if (!alreadyAnswered) return i;
+  }
+  return playerPrompts.length;
+}
+
+/**
  * Submit an answer for a prompt
  */
 function submitAnswer(room, playerId, promptId, answerText) {
@@ -671,6 +690,7 @@ module.exports = {
   assignPromptsToPlayers,
   assignPromptsToPlayersAsync,
   getPlayerPrompts,
+  getPlayerPromptResumeIndex,
   submitAnswer,
   allAnswersSubmitted,
   autoSubmitMissingAnswers,
