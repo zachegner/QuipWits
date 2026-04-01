@@ -16,6 +16,7 @@
     "test:script:timeout": "node tests/scripts/timeout-game.js",
     "test:script:tie": "node tests/scripts/tie-game.js",
     "test:script:decisive": "node tests/scripts/decisive-win-game.js",
+    "test:script:multiplayer": "node tests/scripts/multiplayer-e2e.js",
     "electron:dev": "electron .",
     "build": "electron-builder --config electron-builder.config.js -mwl",
     "build:mac": "electron-builder --config electron-builder.config.js --mac",
