@@ -104,6 +104,44 @@ describe('Game Logic', () => {
       });
     });
 
+    test('GL-006: getPlayerPromptResumeIndex returns 0 when no answers submitted', () => {
+      const room = createTestRoom(4);
+      gameLogic.assignPromptsToPlayers(room);
+
+      const index = gameLogic.getPlayerPromptResumeIndex(room, 'player_0');
+      expect(index).toBe(0);
+    });
+
+    test('GL-006b: getPlayerPromptResumeIndex returns 1 after first prompt answered', () => {
+      const room = createTestRoom(4);
+      gameLogic.assignPromptsToPlayers(room);
+
+      const playerPrompts = room.prompts.filter(
+        p => p.player1Id === 'player_0' || p.player2Id === 'player_0'
+      );
+      // Submit answer for the first prompt
+      const first = playerPrompts[0];
+      gameLogic.submitAnswer(room, 'player_0', first.id, 'First answer');
+
+      const index = gameLogic.getPlayerPromptResumeIndex(room, 'player_0');
+      expect(index).toBe(1);
+    });
+
+    test('GL-006c: getPlayerPromptResumeIndex returns prompt count when all answered', () => {
+      const room = createTestRoom(4);
+      gameLogic.assignPromptsToPlayers(room);
+
+      const playerPrompts = room.prompts.filter(
+        p => p.player1Id === 'player_0' || p.player2Id === 'player_0'
+      );
+      playerPrompts.forEach(p => {
+        gameLogic.submitAnswer(room, 'player_0', p.id, 'Answer');
+      });
+
+      const index = gameLogic.getPlayerPromptResumeIndex(room, 'player_0');
+      expect(index).toBe(playerPrompts.length);
+    });
+
     test('creates prompts with proper structure', () => {
       const room = createTestRoom(4);
       room.currentRound = 1;

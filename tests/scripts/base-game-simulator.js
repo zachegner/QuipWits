@@ -9,7 +9,11 @@ const { CLIENT_EVENTS, SERVER_EVENTS, CONFIG, GAME_STATES } = require('../../sha
 
 class GameSimulator {
   constructor(options = {}) {
-    this.serverUrl = options.serverUrl || 'http://localhost:3000';
+    this.serverUrl =
+      options.serverUrl ||
+      process.env.QUIPWITS_TEST_URL ||
+      process.env.SERVER_URL ||
+      'http://localhost:3000';
     this.playerCount = options.playerCount || 4;
     this.logLevel = options.logLevel || 'info'; // 'debug', 'info', 'warn', 'error'
     this.actionDelay = options.actionDelay || 100; // Delay between actions in ms
@@ -216,7 +220,7 @@ class GameSimulator {
 
   async connectHost() {
     this.log('info', 'Connecting host...');
-    this.hostSocket = io(this.serverUrl);
+    this.hostSocket = io(this.serverUrl, { transports: ['websocket'], forceNew: true });
     
     return new Promise((resolve, reject) => {
       this.hostSocket.on('connect', () => {
@@ -239,7 +243,7 @@ class GameSimulator {
     
     const connections = [];
     for (let i = 0; i < this.playerCount; i++) {
-      const socket = io(this.serverUrl);
+      const socket = io(this.serverUrl, { transports: ['websocket'], forceNew: true });
       this.playerSockets.push(socket);
       
       connections.push(
