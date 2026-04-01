@@ -235,6 +235,7 @@ async function startPromptPhase(roomCode) {
     const prompts = gameLogic.getPlayerPrompts(room, player.id);
     io.to(player.socketId).emit(SERVER_EVENTS.RECEIVE_PROMPTS, {
       prompts,
+      resumeAtIndex: 0,
       timeLimit: CONFIG.ANSWER_TIME_LIMIT
     });
   });
@@ -557,8 +558,10 @@ io.on('connection', (socket) => {
     // Send current game state based on phase
     if (room.state === GAME_STATES.PROMPT) {
       const prompts = gameLogic.getPlayerPrompts(room, playerId);
+      const resumeAtIndex = gameLogic.getPlayerPromptResumeIndex(room, playerId);
       socket.emit(SERVER_EVENTS.RECEIVE_PROMPTS, {
         prompts,
+        resumeAtIndex,
         timeLimit: Math.ceil((room.timerEndTime - Date.now()) / 1000)
       });
     } else if (room.state === GAME_STATES.LAST_LASH) {
@@ -637,6 +640,8 @@ io.on('connection', (socket) => {
         clearTimer(roomCode);
         startVotingPhase(roomCode);
       }
+    } else {
+      socket.emit('answer_failed', { promptId, error: result.error });
     }
   });
   
@@ -892,7 +897,6 @@ function getNetworkAddresses() {
 const savedApiKey = config.getAnthropicApiKey();
 if (savedApiKey) {
   process.env.ANTHROPIC_API_KEY = savedApiKey;
-  console.log('📦 Loaded API key from config');
 }
 
 // Start server
