@@ -6,14 +6,6 @@
 // Increase timeout for integration tests
 jest.setTimeout(10000);
 
-// Mock console.log to keep test output clean (optional)
-// global.console = {
-//   ...console,
-//   log: jest.fn(),
-//   debug: jest.fn(),
-//   info: jest.fn(),
-// };
-
 // Helper to generate unique test identifiers
 global.generateTestId = () => `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
