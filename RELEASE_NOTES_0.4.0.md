@@ -51,7 +51,7 @@ All existing features remain fully functional:
 - ✅ **The Last Wit**: Exciting final round with three random modes:
   - **Flashback Lash**: Complete the story
   - **Word Lash**: Create phrases from starting letters
-  - **Acro Lash**: Expand acronyms creatively
+  - **Roast Lash**: Shared roast topic; everyone piles on with one-liners
 - ✅ **Host Controls**: Pause, resume, skip, and kick players
 - ✅ **Score Tracking**: Full scoreboard with round-by-round points
 - ✅ **Reconnection Support**: Players can rejoin if disconnected

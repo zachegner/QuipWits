@@ -50,11 +50,21 @@ That's it! The server will start and show you the connection info.
 
 The game includes hundreds of pre-made prompts, but you can enable **AI-generated prompts** for endless variety!
 
+Two AI providers are supported:
+
+| Provider | Model | API Key Format |
+|----------|-------|---------------|
+| **Anthropic** (default) | Claude Haiku | `sk-ant-...` |
+| **xAI** | Grok 4.1 Fast | `xai-...` |
+
 ### Setting Up AI Prompts
 
-1. Get an API key from [console.anthropic.com](https://console.anthropic.com/)
-2. **Option A**: In the host setup screen, paste your API key and click "Save"
-3. **Option B**: Create a `.env` file with: `ANTHROPIC_API_KEY=sk-ant-your-key-here`
+1. Pick a provider in the host setup screen (`Anthropic` or `xAI`)
+2. Get an API key:
+   - Anthropic: [console.anthropic.com](https://console.anthropic.com/)
+   - xAI: [console.x.ai](https://console.x.ai/)
+3. **Option A**: Paste your key in the setup screen and click "Save API Key"
+4. **Option B**: Create a `.env` file (see below for env var names)
 
 Without an API key, the game works perfectly with built-in prompts!
 
@@ -71,7 +81,9 @@ Settings are saved to:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `aiProvider` | `"anthropic"` | Active AI provider (`anthropic` or `xai`) |
 | `anthropicApiKey` | `""` | Your Anthropic API key |
+| `xaiApiKey` | `""` | Your xAI API key |
 | `port` | `3000` | Server port |
 
 ---
@@ -127,7 +139,12 @@ npm run build:linux  # Linux only
 
 ```bash
 # Create .env file with:
+# For Anthropic (default provider):
 ANTHROPIC_API_KEY=sk-ant-your-key
+
+# For xAI:
+XAI_API_KEY=xai-your-key
+
 PORT=3000
 ```
 
@@ -149,7 +166,7 @@ The game concludes with **The Last Wit** - a high-stakes final round where every
 |------|-------------|---------|
 | **Flashback Lash** | Complete a story setup | "I was at my wedding when suddenly..." |
 | **Word Lash** | Create a phrase from starting letters | "T. F. N." → "Totally Fake News" |
-| **Acro Lash** | Expand an acronym (3-5 letters) | "L. O. L." → "Llamas On Ladders" |
+| **Roast Lash** | Everyone roasts the same topic | "Your most brutal review of airport security:" |
 
 The Last Wit is worth **double points** - a chance for underdogs to steal the victory!
 
@@ -166,7 +183,7 @@ The Last Wit is worth **double points** - a chance for underdogs to steal the vi
 
 Questions or issues? Check the terminal output for error messages.
 
-Made for friends who appreciate adult humor! 🎭
+Adult Mode (xAI only) delivers edgy, provocative prompts in the style of Cards Against Humanity. Not every prompt is sexual — the game stays well-rounded and fun.
 
 ---
 
