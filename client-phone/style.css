@@ -75,8 +75,8 @@ input, textarea, select {
   text-transform: uppercase;
   color: var(--neon-cyan);
   text-shadow: 
-    0 0 10px var(--neon-cyan),
-    0 0 20px var(--neon-cyan);
+    0 0 6px var(--neon-cyan),
+    0 0 12px var(--neon-cyan);
   margin-bottom: 2rem;
   text-align: center;
 }
@@ -107,12 +107,12 @@ input, textarea, select {
   text-shadow: 0 0 10px var(--neon-cyan);
 }
 
-.screen-title.last-lash.mode-acro {
+.screen-title.last-lash.mode-roast {
   color: var(--neon-pink);
   text-shadow: 0 0 10px var(--neon-pink);
 }
 
-/* Letter display for Word Lash and Acro Lash */
+/* Letter display for Word Lash */
 .last-wit-letters {
   font-family: 'Press Start 2P', cursive;
   font-size: 2rem;

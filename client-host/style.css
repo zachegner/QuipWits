@@ -111,10 +111,10 @@ body {
   text-transform: uppercase;
   color: var(--neon-cyan);
   text-shadow: 
-    0 0 10px var(--neon-cyan),
-    0 0 20px var(--neon-cyan),
-    0 0 40px var(--neon-cyan),
-    0 0 80px var(--neon-pink);
+    0 0 6px var(--neon-cyan),
+    0 0 12px var(--neon-cyan),
+    0 0 22px var(--neon-cyan),
+    0 0 40px var(--neon-pink);
   margin-bottom: 2rem;
   letter-spacing: 0.2em;
 }
@@ -798,7 +798,7 @@ body {
     0 0 40px var(--neon-pink) !important;
 }
 
-.last-lash-title.mode-acro {
+.last-lash-title.mode-roast {
   color: var(--neon-pink) !important;
   text-shadow: 
     0 0 10px var(--neon-pink),
@@ -806,7 +806,7 @@ body {
     0 0 40px var(--neon-yellow) !important;
 }
 
-/* Large letter display for Word Lash and Acro Lash */
+/* Large letter display for Word Lash */
 .last-wit-letters {
   font-family: 'Press Start 2P', cursive;
   font-size: 4rem;
@@ -1083,6 +1083,60 @@ body {
 .network-info .url {
   font-size: 1.3rem;
   word-break: break-all;
+}
+
+/* Provider Selector */
+.provider-selector {
+  margin-bottom: 1rem;
+}
+
+.provider-label {
+  display: block;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.7rem;
+  color: var(--color-cyan, #00ffff);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+
+.provider-options {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.provider-option {
+  cursor: pointer;
+}
+
+.provider-option input[type="radio"] {
+  display: none;
+}
+
+.provider-btn {
+  display: inline-block;
+  padding: 0.45rem 1.2rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.provider-option input[type="radio"]:checked + .provider-btn {
+  border-color: var(--color-cyan, #00ffff);
+  color: #fff;
+  background: rgba(0, 255, 255, 0.12);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+}
+
+.provider-btn:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 /* API Key Status */
@@ -1373,7 +1427,7 @@ body {
   color: var(--neon-cyan);
 }
 
-.mode-option[data-mode="ACRO_LASH"] .mode-name {
+.mode-option[data-mode="ROAST_LASH"] .mode-name {
   color: var(--neon-pink);
 }
 
@@ -1469,7 +1523,7 @@ body {
   text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-cyan);
 }
 
-.mode-intro-title.mode-acro {
+.mode-intro-title.mode-roast {
   color: var(--neon-pink);
   text-shadow: 0 0 20px var(--neon-pink), 0 0 40px var(--neon-pink);
 }

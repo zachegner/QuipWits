@@ -8,7 +8,7 @@ const {
   generateLastWitPrompt,
   generateLastWitPromptAsync,
   validateWordLashAnswer,
-  validateAcroLashAnswer
+  pickRandomThemeLabel
 } = require('./promptGenerator');
 
 /**
@@ -40,9 +40,8 @@ function assignPromptsToPlayers(room) {
  * Each prompt goes to exactly 2 players
  * Each player gets PROMPTS_PER_PLAYER prompts
  * @param {Object} room - The game room
- * @param {string|null} theme - Optional theme for themed prompt generation
  */
-async function assignPromptsToPlayersAsync(room, theme = null) {
+async function assignPromptsToPlayersAsync(room, isAdult = false) {
   const players = room.players;
   const playerCount = players.length;
   const promptsPerPlayer = CONFIG.PROMPTS_PER_PLAYER;
@@ -55,8 +54,9 @@ async function assignPromptsToPlayersAsync(room, theme = null) {
   // Calculate number of prompts needed
   const promptCount = getPromptsNeededForRound(playerCount, promptsPerPlayer);
   
-  // Generate unique prompts with AI fallback, passing theme for themed generation
-  const promptTexts = await generateUniquePromptsAsync(promptCount, room.usedPrompts, true, theme);
+  const themes = room.themes && room.themes.length ? room.themes : null;
+  // Generate unique prompts with AI fallback, passing theme(s) and adult mode
+  const promptTexts = await generateUniquePromptsAsync(promptCount, room.usedPrompts, true, themes, isAdult || room.adultMode);
   
   return assignPromptsToPlayersWithTexts(room, promptTexts, players, playerCount, promptsPerPlayer);
 }
@@ -435,7 +435,7 @@ function getScoreboard(room) {
 
 /**
  * Setup Last Wit round with randomly selected mode
- * Modes: FLASHBACK (complete the story), WORD_LASH (phrase from letters), ACRO_LASH (expand acronym)
+ * Modes: FLASHBACK (complete the story), WORD_LASH (phrase from letters), ROAST_LASH (shared roast prompt)
  */
 function setupLastLash(room) {
   if (!room.usedPrompts) {
@@ -443,7 +443,7 @@ function setupLastLash(room) {
   }
   
   // Generate Last Wit prompt with random mode selection
-  const lastWitData = generateLastWitPrompt(room.usedPrompts);
+  const lastWitData = generateLastWitPrompt(room.usedPrompts, null, !!room.adultMode);
   
   room.lastLashPrompt = lastWitData.prompt;
   room.lastLashMode = lastWitData.mode;
@@ -468,15 +468,23 @@ function setupLastLash(room) {
 /**
  * Setup Last Wit round (async version with AI fallback)
  * @param {Object} room - The game room
- * @param {string|null} theme - Optional theme for themed prompt generation
  */
-async function setupLastLashAsync(room, theme = null) {
+async function setupLastLashAsync(room, isAdult = false) {
   if (!room.usedPrompts) {
     room.usedPrompts = new Set();
   }
   
+  const { label: themeLabel, crossover } = pickRandomThemeLabel(room.themes);
+  const themeForLastWit = themeLabel;
+  
   // Generate Last Wit prompt with random mode selection and AI support
-  const lastWitData = await generateLastWitPromptAsync(room.usedPrompts, true, theme);
+  const lastWitData = await generateLastWitPromptAsync(
+    room.usedPrompts,
+    true,
+    themeForLastWit,
+    isAdult || room.adultMode,
+    crossover
+  );
   
   room.lastLashPrompt = lastWitData.prompt;
   room.lastLashMode = lastWitData.mode;
@@ -500,7 +508,7 @@ async function setupLastLashAsync(room, theme = null) {
 
 /**
  * Submit Last Wit answer with mode-specific soft validation
- * For WORD_LASH and ACRO_LASH, validates letter matching (case-insensitive)
+ * For WORD_LASH, validates letter matching (case-insensitive)
  */
 function submitLastLashAnswer(room, playerId, answerText) {
   // Check if already submitted
@@ -515,11 +523,6 @@ function submitLastLashAnswer(room, playerId, answerText) {
   
   if (room.lastLashMode === LAST_WIT_MODES.WORD_LASH && room.lastLashLetters) {
     const validation = validateWordLashAnswer(trimmedAnswer, room.lastLashLetters);
-    if (!validation.valid) {
-      validationWarning = validation.message;
-    }
-  } else if (room.lastLashMode === LAST_WIT_MODES.ACRO_LASH && room.lastLashLetters) {
-    const validation = validateAcroLashAnswer(trimmedAnswer, room.lastLashLetters);
     if (!validation.valid) {
       validationWarning = validation.message;
     }

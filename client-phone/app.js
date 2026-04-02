@@ -32,6 +32,13 @@ function showScreen(screenName) {
   if (screens[screenName]) {
     screens[screenName].classList.add('active');
   }
+  // Reset waiting screen content to defaults so Last Wit text doesn't persist
+  if (screenName === 'waiting') {
+    const title = document.querySelector('#waiting-screen .screen-title');
+    const subtext = document.querySelector('#waiting-screen .waiting-text');
+    if (title) title.textContent = 'SUBMITTED!';
+    if (subtext) subtext.textContent = 'Waiting for other players...';
+  }
 }
 
 // Initialize
@@ -418,9 +425,9 @@ socket.on('last_lash_prompt', (data) => {
         titleEl.textContent = 'WORD LASH';
         titleEl.className = 'screen-title last-lash mode-word';
         break;
-      case 'ACRO_LASH':
-        titleEl.textContent = 'ACRO LASH';
-        titleEl.className = 'screen-title last-lash mode-acro';
+      case 'ROAST_LASH':
+        titleEl.textContent = 'ROAST LASH';
+        titleEl.className = 'screen-title last-lash mode-roast';
         break;
       default:
         titleEl.textContent = 'THE LAST WIT';
@@ -437,8 +444,8 @@ socket.on('last_lash_prompt', (data) => {
       case 'WORD_LASH':
         instructionsEl.textContent = 'Create a phrase where each word starts with these letters';
         break;
-      case 'ACRO_LASH':
-        instructionsEl.textContent = 'What does this acronym stand for?';
+      case 'ROAST_LASH':
+        instructionsEl.textContent = 'Deliver your funniest roast or one-liner!';
         break;
       default:
         instructionsEl.textContent = 'Make it your best!';
@@ -455,17 +462,17 @@ socket.on('last_lash_prompt', (data) => {
       case 'WORD_LASH':
         placeholderText.placeholder = lastWitLetters ? `${lastWitLetters.join(' ')} ...` : 'Your phrase...';
         break;
-      case 'ACRO_LASH':
-        placeholderText.placeholder = lastWitLetters ? `${lastWitLetters.length} words starting with ${lastWitLetters.join(', ')}` : 'Expand the acronym...';
+      case 'ROAST_LASH':
+        placeholderText.placeholder = 'Your roast...';
         break;
       default:
         placeholderText.placeholder = 'Make it your best!';
     }
   }
   
-  // Display prompt (letters for WORD_LASH/ACRO_LASH, story for FLASHBACK)
+  // Display prompt (letters for WORD_LASH; full text for FLASHBACK / ROAST_LASH)
   if (promptEl) {
-    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+    if (lastWitMode === 'WORD_LASH' && lastWitLetters) {
       promptEl.innerHTML = `<span class="last-wit-letters">${lastWitLetters.join('. ')}.</span>`;
     } else {
       promptEl.textContent = data.prompt;
@@ -505,8 +512,8 @@ socket.on('last_lash_voting', (data) => {
       case 'WORD_LASH':
         voteTitleEl.textContent = 'WORD LASH - VOTE!';
         break;
-      case 'ACRO_LASH':
-        voteTitleEl.textContent = 'ACRO LASH - VOTE!';
+      case 'ROAST_LASH':
+        voteTitleEl.textContent = 'ROAST LASH - VOTE!';
         break;
       default:
         voteTitleEl.textContent = 'PICK YOUR FAVORITE!';
@@ -516,7 +523,7 @@ socket.on('last_lash_voting', (data) => {
   // Display prompt/letters
   const votePromptEl = document.getElementById('ll-vote-prompt');
   if (votePromptEl) {
-    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+    if (lastWitMode === 'WORD_LASH' && lastWitLetters) {
       votePromptEl.innerHTML = `<span class="last-wit-letters-small">${lastWitLetters.join('. ')}.</span>`;
     } else {
       votePromptEl.textContent = data.prompt;

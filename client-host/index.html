@@ -44,8 +44,22 @@
         
         <div class="setup-section">
           <h3 class="setup-label">AI PROMPTS (Optional)</h3>
-          <p class="setup-hint">Add an Anthropic API key to enable AI-generated prompts. Without it, the game uses pre-made prompts.</p>
-          
+          <p class="setup-hint">Select an AI provider and enter your API key to enable AI-generated prompts. Without it, the game uses pre-made prompts. <strong>Adult Mode is only available with xAI Grok.</strong></p>
+
+          <div class="provider-selector">
+            <label class="provider-label">AI PROVIDER</label>
+            <div class="provider-options">
+              <label class="provider-option">
+                <input type="radio" name="ai-provider" id="provider-anthropic" value="anthropic" checked>
+                <span class="provider-btn">Anthropic</span>
+              </label>
+              <label class="provider-option">
+                <input type="radio" name="ai-provider" id="provider-xai" value="xai">
+                <span class="provider-btn">xAI</span>
+              </label>
+            </div>
+          </div>
+
           <div class="api-key-status" id="api-key-status">
             <span class="status-icon" id="api-status-icon">❌</span>
             <span id="api-status-text">No API key configured</span>
@@ -65,7 +79,16 @@
             <button id="test-api-btn" class="control-btn secondary">TEST</button>
           </div>
           
-          <p class="api-key-note">Get your API key at <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a></p>
+          <p class="api-key-note" id="api-key-note">Get your API key at <a href="https://console.anthropic.com/" target="_blank" id="api-key-link">console.anthropic.com</a></p>
+          
+          <!-- Adult Mode (xAI only) -->
+          <div class="adult-mode-toggle" id="adult-mode-section" style="display: none; margin-top: 15px; padding: 10px; border: 1px solid #ff00aa; border-radius: 5px; background: rgba(255, 0, 170, 0.1);">
+            <label class="checkbox-label" style="color: #ff00aa; font-weight: bold;">
+              <input type="checkbox" id="adult-mode-toggle" style="accent-color: #ff00aa;">
+              <span>🔞 ADULT MODE (xAI Grok only)</span>
+            </label>
+            <p style="font-size: 0.8rem; margin: 5px 0 0; color: #ff99cc;">NSFW</p>
+          </div>
         </div>
         
         <button id="continue-to-lobby-btn" class="neon-button">CONTINUE TO LOBBY →</button>
@@ -104,8 +127,8 @@
       
       <div class="host-controls" id="lobby-controls">
         <div class="theme-input-container">
-          <label for="theme-input" class="theme-label">GAME THEME (optional)</label>
-          <input type="text" id="theme-input" class="theme-input" placeholder="e.g., 80s movies, space, dating disasters" maxlength="120">
+          <label for="theme-input" class="theme-label">GAME THEME(S) (optional)</label>
+          <input type="text" id="theme-input" class="theme-input" placeholder="Comma-separated: e.g. Star Wars, The Office, cooking" maxlength="360">
         </div>
         <button id="settings-btn" class="control-btn secondary">⚙️ SETTINGS</button>
         <div class="ai-status-badge" id="lobby-ai-status">
@@ -213,8 +236,8 @@
           <div class="mode-option" data-mode="WORD_LASH">
             <span class="mode-name">WORD LASH</span>
           </div>
-          <div class="mode-option" data-mode="ACRO_LASH">
-            <span class="mode-name">ACRO LASH</span>
+          <div class="mode-option" data-mode="ROAST_LASH">
+            <span class="mode-name">ROAST LASH</span>
           </div>
         </div>
         <div class="mode-selector-arrow"></div>

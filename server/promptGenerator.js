@@ -6,6 +6,8 @@ require('dotenv').config();
 
 // Anthropic SDK for AI-powered prompt generation
 const Anthropic = require('@anthropic-ai/sdk').default;
+// OpenAI-compatible client used for xAI
+const OpenAI = require('openai');
 
 // Config module for API key management
 const config = require('./config');
@@ -27,36 +29,240 @@ function loadTemplates() {
   return JSON.parse(fs.readFileSync(templatesPath, 'utf8'));
 }
 
-const promptData = loadTemplates();
+// Load adult templates separately
+function loadAdultTemplates() {
+  const basePath = getBasePath();
+  const adultTemplatesPath = path.join(basePath, 'prompts', 'adult-templates.json');
+  try {
+    return JSON.parse(fs.readFileSync(adultTemplatesPath, 'utf8'));
+  } catch (error) {
+    console.warn('Adult templates not found, falling back to standard:', error.message);
+    return { templates: [], fillWords: {} };
+  }
+}
 
-// Initialize Anthropic client (lazy initialization to handle missing API key gracefully)
+const promptData = loadTemplates();
+const adultPromptData = loadAdultTemplates();
+
+/** Max themes from host input; max chars per segment; max raw input length */
+const MAX_THEMES = 6;
+const MAX_THEME_SEGMENT_LEN = 40;
+const MAX_THEME_INPUT_LEN = 360;
+
+const THEME_STOPWORDS = new Set([
+  'and', 'or', 'the', 'a', 'an', 'for', 'of', 'in', 'on', 'at', 'to', 'as', 'by'
+]);
+
+/**
+ * Parse host theme field into a deduped list of theme strings, or null if empty.
+ * @param {string|null|undefined} raw
+ * @returns {string[]|null}
+ */
+function parseThemes(raw) {
+  if (raw == null || typeof raw !== 'string') return null;
+  const trimmed = raw.trim().substring(0, MAX_THEME_INPUT_LEN);
+  if (!trimmed) return null;
+  const parts = trimmed.split(/[,;\n\r]+/).map(s => s.trim()).filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const p of parts) {
+    const seg = p.length > MAX_THEME_SEGMENT_LEN ? p.substring(0, MAX_THEME_SEGMENT_LEN).trim() : p;
+    if (!seg) continue;
+    const key = seg.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(seg);
+    if (out.length >= MAX_THEMES) break;
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * Build batches of prompts per theme label (single-theme or crossover "A and B").
+ * @param {number} count
+ * @param {string[]} themes
+ * @returns {{ label: string, count: number, crossover: boolean }[]}
+ */
+function buildThemeLabelBuckets(count, themes) {
+  /** @type {{ label: string, count: number, crossover: boolean }[]} */
+  const buckets = [];
+  if (!themes || themes.length === 0) return buckets;
+  if (themes.length === 1) {
+    buckets.push({ label: themes[0], count, crossover: false });
+    return buckets;
+  }
+
+  let comboCount = 0;
+  if (count >= 4) {
+    comboCount = Math.max(1, Math.round(count * 0.32));
+  } else if (count === 3) {
+    comboCount = 1;
+  }
+  if (count === 2) comboCount = 0;
+  comboCount = Math.min(comboCount, Math.max(0, count - 1));
+
+  const singleTotal = count - comboCount;
+  const perTheme = new Map();
+  themes.forEach(t => perTheme.set(t, 0));
+  for (let i = 0; i < singleTotal; i++) {
+    const t = themes[i % themes.length];
+    perTheme.set(t, perTheme.get(t) + 1);
+  }
+  for (const [label, c] of perTheme) {
+    if (c > 0) buckets.push({ label, count: c, crossover: false });
+  }
+
+  for (let k = 0; k < comboCount; k++) {
+    let i = Math.floor(Math.random() * themes.length);
+    let j = (i + 1 + Math.floor(Math.random() * (themes.length - 1))) % themes.length;
+    const label = `${themes[i]} and ${themes[j]}`;
+    const existing = buckets.find(b => b.label === label && b.crossover);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      buckets.push({ label, count: 1, crossover: true });
+    }
+  }
+
+  let sum = buckets.reduce((s, b) => s + b.count, 0);
+  if (sum !== count && buckets.length > 0) {
+    buckets[0].count += count - sum;
+  }
+  return buckets;
+}
+
+/**
+ * Pick a random single-theme or two-theme crossover label for Last Wit (Flashback AI).
+ * @param {string[]|null|undefined} themes
+ * @returns {{ label: string|null, crossover: boolean }}
+ */
+function pickRandomThemeLabel(themes) {
+  if (!themes || themes.length === 0) {
+    return { label: null, crossover: false };
+  }
+  if (themes.length === 1) {
+    return { label: themes[0], crossover: false };
+  }
+  const useCombo = Math.random() < 0.45;
+  if (!useCombo) {
+    return { label: themes[Math.floor(Math.random() * themes.length)], crossover: false };
+  }
+  let i = Math.floor(Math.random() * themes.length);
+  let j = (i + 1 + Math.floor(Math.random() * (themes.length - 1))) % themes.length;
+  return { label: `${themes[i]} and ${themes[j]}`, crossover: true };
+}
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/**
+ * @param {string[]|string|null|undefined} themeOrThemes
+ * @returns {string[]|null}
+ */
+function normalizeThemesArg(themeOrThemes) {
+  if (themeOrThemes == null) return null;
+  if (Array.isArray(themeOrThemes)) {
+    return themeOrThemes.length ? themeOrThemes : null;
+  }
+  if (typeof themeOrThemes === 'string' && themeOrThemes.trim()) {
+    return [themeOrThemes.trim()];
+  }
+  return null;
+}
+
+// Lazy-initialized AI clients
 let anthropicClient = null;
+let xaiClient = null;
+
+// Model identifiers
+const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
+const XAI_MODEL = 'grok-4-1-fast-non-reasoning';
 
 function getAnthropicClient() {
   const apiKey = config.getAnthropicApiKey() || process.env.ANTHROPIC_API_KEY;
-  
   if (!apiKey) {
     anthropicClient = null;
     return null;
   }
-  
-  // Reinitialize if no client or if the key might have changed
   if (!anthropicClient) {
-    anthropicClient = new Anthropic({
-      apiKey: apiKey,
-    });
+    anthropicClient = new Anthropic({ apiKey });
   }
-  
   return anthropicClient;
 }
 
+function getXaiClient() {
+  const apiKey = config.getXaiApiKey() || process.env.XAI_API_KEY;
+  if (!apiKey) {
+    xaiClient = null;
+    return null;
+  }
+  if (!xaiClient) {
+    xaiClient = new OpenAI({ apiKey, baseURL: 'https://api.x.ai/v1' });
+  }
+  return xaiClient;
+}
+
 /**
- * Reinitialize the Anthropic client (call after API key changes)
+ * Return the active AI client based on the configured provider.
+ * Returns null if the active provider has no key configured.
+ */
+function getActiveClient() {
+  const provider = config.getActiveProvider();
+  if (provider === config.PROVIDERS.XAI) {
+    return getXaiClient();
+  }
+  return getAnthropicClient();
+}
+
+/**
+ * Reinitialize all AI clients (call after API key/provider changes)
  */
 function reinitializeClient() {
   anthropicClient = null;
-  // Force recreation on next use
-  return getAnthropicClient();
+  xaiClient = null;
+  return getActiveClient();
+}
+
+/**
+ * Unified AI message call that normalizes Anthropic vs xAI (OpenAI-compat) APIs.
+ * @param {object} opts
+ * @param {string} opts.system - System prompt text
+ * @param {string} opts.userContent - User message content
+ * @param {number} opts.maxTokens - Max tokens to generate
+ * @returns {Promise<string>} Generated text
+ */
+async function callAI({ system, userContent, maxTokens }) {
+  const provider = config.getActiveProvider();
+
+  if (provider === config.PROVIDERS.XAI) {
+    const client = getXaiClient();
+    if (!client) throw new Error('xAI client not initialized - check XAI_API_KEY');
+    const response = await client.chat.completions.create({
+      model: XAI_MODEL,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userContent }
+      ]
+    });
+    return response.choices[0].message.content;
+  }
+
+  // Default: Anthropic
+  const client = getAnthropicClient();
+  if (!client) throw new Error('Anthropic client not initialized - check ANTHROPIC_API_KEY');
+  const message = await client.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: userContent }],
+    system
+  });
+  return message.content[0].text;
 }
 
 // Base system prompt for AI-generated prompts (no theme)
@@ -85,22 +291,56 @@ Example prompts:
 
 Generate creative, original, adult-oriented prompts in a similar style.`;
 
+// Adult mode system prompt - well-rounded like Cards Against Humanity
+// Allows edgy/sexual content but does not require every prompt to be sexual
+const ADULT_SYSTEM_PROMPT = `You are a hilarious comedy writer for an adult party game like Cards Against Humanity or Quiplash. Generate funny, edgy, provocative, cringe-worthy, dark, and taboo fill-in-the-blank prompts.
+
+Guidelines for ADULT MODE:
+- Create a good mix of humor: awkward social situations, relationships, dark comedy, bodily functions, cheating, family embarrassment, work disasters, drinking stories, and yes - sometimes sexual/risqué content
+- Not every prompt needs to be sexual. Variety is key for a fun, well-rounded game
+- Be crude, vulgar, offensive, shocking, or hilariously uncomfortable when it fits
+- Make prompts that will make players laugh, blush, gasp, or groan
+- Keep prompts concise (under 100 characters ideally) but punchy and memorable
+- Format: A statement or question that players complete with their funniest answer
+
+Example prompts:
+- "The worst thing to moan during sex with your boss"
+- "Something you shouldn't do with a family member at Thanksgiving"
+- "A terrible safe word that would ruin the mood"
+- "The most awkward thing to have in your search history"
+- "What your therapist really thinks about your sex life"
+- "The worst text to accidentally send to your mom"
+- "Something that sounds dirty but is actually about your job"
+
+Generate creative, entertaining, boundary-pushing prompts with good variety.`;
+
 /**
  * Get AI system prompt, building a theme-focused prompt when a theme is provided
  * When themed, the entire prompt is rewritten to prioritize the theme's universe,
  * characters, and humor style over generic adult party game content.
  * @param {string|null} theme - Optional theme to incorporate into prompts
+ * @param {boolean} isCrossover - True when combining two distinct themes in one prompt set
  * @returns {string} The system prompt for AI generation
  */
-function getAISystemPrompt(theme = null) {
+function getAISystemPrompt(theme = null, isAdult = false, isCrossover = false) {
+  if (isAdult) {
+    return ADULT_SYSTEM_PROMPT;
+  }
+  
   if (!theme) {
     return AI_SYSTEM_PROMPT_BASE;
   }
   
+  const crossoverBlock = isCrossover
+    ? `
+CROSSOVER: These prompts must humorously combine BOTH worlds in "${theme}" — mash up characters, settings, or tone from each side. Keep jokes simple enough that casual fans of either side can enjoy them.
+`
+    : '';
+  
   // When a theme is provided, build a theme-focused prompt that's simple and accessible
   // Handle both media franchises and general topics/concepts
   return `You are a hilarious comedy writer for a QuipLash-style party game. Your job is to generate funny, creative fill-in-the-blank style prompts inspired by the theme: "${theme}"
-
+${crossoverBlock}
 SIMPLICITY FIRST:
 - Prompts must be IMMEDIATELY understandable - players should "get it" on first read
 - Use well-known characters, concepts, or situations from "${theme}" that casual fans would recognize
@@ -154,6 +394,27 @@ function generatePrompt(template, fillWords) {
   }
   
   return prompt;
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Words to use for light theme-relevance checks (strips stopwords; splits "A and B" crossovers).
+ * @param {string} theme
+ * @returns {string[]}
+ */
+function themeRelevanceWords(theme) {
+  const themeLower = theme.toLowerCase();
+  const parts = themeLower.split(/\s+and\s+/);
+  const words = [];
+  for (const part of parts) {
+    for (const w of part.split(/\s+/)) {
+      if (w.length > 2 && !THEME_STOPWORDS.has(w)) words.push(w);
+    }
+  }
+  return words;
 }
 
 /**
@@ -217,14 +478,10 @@ function isValidPrompt(prompt, theme = null) {
   // We're lenient here - the AI and sanitization handle appropriateness
   // This just catches completely unrelated prompts
   if (theme) {
-    const themeLower = theme.toLowerCase();
     const promptLower = prompt.toLowerCase();
-    
-    // Check if theme words appear in prompt (flexible matching)
-    const themeWords = themeLower.split(/\s+/).filter(w => w.length > 2); // Only check words longer than 2 chars
+    const themeWords = themeRelevanceWords(theme);
     const hasThemeReference = themeWords.length > 0 && themeWords.some(word => {
-      // Check if theme word appears in prompt (but not as part of another word)
-      const wordRegex = new RegExp(`\\b${word}\\w*\\b`, 'i');
+      const wordRegex = new RegExp(`\\b${escapeRegex(word)}\\w*\\b`, 'i');
       return wordRegex.test(promptLower);
     });
     
@@ -232,9 +489,6 @@ function isValidPrompt(prompt, theme = null) {
     // Since we have sanitization, we trust the AI to generate appropriate content
     // Only reject if it's a very specific single word and the prompt has no connection
     if (themeWords.length === 1 && !hasThemeReference) {
-      // Be very lenient - only reject if the prompt is clearly generic/unrelated
-      // Most themes will work fine even without explicit word matches
-      // (e.g., "space" theme could have prompts about astronauts, planets, etc.)
       return true; // Allow through - trust the AI's judgment
     }
   }
@@ -243,37 +497,35 @@ function isValidPrompt(prompt, theme = null) {
 }
 
 /**
- * Sanitize a theme by getting an appropriate alternative that maintains the original intent
+ * Sanitize a theme by getting an appropriate alternative that maintains the original intent.
+ * In Adult Mode, we skip sanitization completely (no filtering).
  * @param {string} originalTheme - The original theme that was deemed inappropriate
- * @returns {Promise<string|null>} An appropriate alternative theme, or null if sanitization fails
+ * @param {boolean} isAdult - Whether adult mode is active (if true, no sanitization)
+ * @returns {Promise<string|null>} An appropriate alternative theme, or null if sanitization fails/skipped
  */
-async function sanitizeTheme(originalTheme) {
-  const client = getAnthropicClient();
-  if (!client) {
+async function sanitizeTheme(originalTheme, isAdult = false) {
+  if (isAdult) {
+    // No filtering in Adult Mode - allow any theme
+    return null;
+  }
+
+  if (!getActiveClient()) {
     return null;
   }
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 128,
-      messages: [
-        {
-          role: 'user',
-          content: `The theme "${originalTheme}" is not appropriate for generating party game prompts. Suggest a more appropriate, family-friendly alternative theme that captures the same general concept or category. 
+    const sanitized = (await callAI({
+      system: 'You are a helpful assistant that suggests appropriate alternative themes for party games while maintaining the original concept.',
+      userContent: `The theme "${originalTheme}" is not appropriate for generating party game prompts. Suggest a more appropriate, family-friendly alternative theme that captures the same general concept or category. 
 
 For example:
 - "penis" → "anatomy" or "biology" or "health"
 - "sex" → "dating" or "relationships"
 - "drugs" → "medicine" or "pharmacy"
 
-Return ONLY the alternative theme (1-3 words), nothing else.`
-        }
-      ],
-      system: 'You are a helpful assistant that suggests appropriate alternative themes for party games while maintaining the original concept.'
-    });
-
-    const sanitized = message.content[0].text.trim();
+Return ONLY the alternative theme (1-3 words), nothing else.`,
+      maxTokens: 128
+    })).trim();
     // Clean up any extra text
     const lines = sanitized.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const result = lines[0] || sanitized;
@@ -282,7 +534,6 @@ Return ONLY the alternative theme (1-3 words), nothing else.`
     const cleanResult = result.replace(/^["']|["']$/g, '').trim();
     
     if (cleanResult && cleanResult.length > 0 && cleanResult.length < 50) {
-      console.log(`Sanitized theme: "${originalTheme}" → "${cleanResult}"`);
       return cleanResult;
     }
     
@@ -299,37 +550,32 @@ Return ONLY the alternative theme (1-3 words), nothing else.`
  * @param {Set} usedPrompts - Set of already used prompt strings to avoid
  * @param {string|null} theme - Optional theme for themed prompt generation
  * @param {string|null} originalTheme - The original theme if this is a sanitized attempt
+ * @param {boolean} isAdult - Whether adult mode is active (skips all theme sanitization)
+ * @param {boolean} isCrossover - Two-theme mashup prompts ("A and B")
  * @returns {Promise<Array>} Array of AI-generated prompt strings
  */
-async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = null, originalTheme = null) {
-  const client = getAnthropicClient();
-  if (!client) {
-    throw new Error('Anthropic client not initialized - check ANTHROPIC_API_KEY');
+async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = null, originalTheme = null, isAdult = false, isCrossover = false) {
+  if (!getActiveClient()) {
+    throw new Error('AI client not initialized - check your API key for the selected provider');
   }
 
-  const usedList = Array.from(usedPrompts).slice(-20); // Include recent prompts for context
+  const usedList = Array.from(usedPrompts).slice(-20);
   const usedContext = usedList.length > 0 
     ? `\n\nAvoid these already-used prompts:\n${usedList.map(p => `- "${p}"`).join('\n')}`
     : '';
   
+  const crossoverHint = isCrossover && theme
+    ? ' Combine both worlds in each prompt in a funny, accessible way.'
+    : '';
   const themeContext = theme 
-    ? `\n\nIMPORTANT: Create prompts inspired by "${theme}" that are simple and immediately understandable. Use well-known characters or concepts that casual fans would recognize. Prioritize clarity and accessibility - players should understand the prompt on first read without needing deep theme knowledge. Always generate actual prompts, never explanations or refusals.`
+    ? `\n\nIMPORTANT: Create prompts inspired by "${theme}" that are simple and immediately understandable. Use well-known characters or concepts that casual fans would recognize. Prioritize clarity and accessibility - players should understand the prompt on first read without needing deep theme knowledge.${crossoverHint} Always generate actual prompts, never explanations or refusals.`
     : '';
 
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: `Generate exactly ${count} unique, creative QuipLash-style prompts. Return ONLY the prompts, one per line, no numbering or extra formatting.${usedContext}${themeContext}`
-      }
-    ],
-    system: getAISystemPrompt(theme),
+  const responseText = await callAI({
+    system: getAISystemPrompt(theme, isAdult, isCrossover),
+    userContent: `Generate exactly ${count} unique, creative QuipLash-style prompts. Return ONLY the prompts, one per line, no numbering or extra formatting.${usedContext}${themeContext}`,
+    maxTokens: 1024
   });
-
-  // Parse response - each line is a prompt
-  const responseText = message.content[0].text;
   const allLines = responseText
     .split('\n')
     .map(line => line.trim())
@@ -338,20 +584,35 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
   // Filter out AI refusals/explanations and keep only valid prompts
   const validPrompts = allLines.filter(line => isValidPrompt(line, theme));
   
+  // For adult mode with xAI, be more lenient with validation since prompts are intentionally edgy
+  if (isAdult && validPrompts.length === 0) {
+    return allLines.slice(0, count); // Accept more aggressive content
+  }
+  
   // If we got valid prompts, return them (up to count)
   if (validPrompts.length > 0) {
     return validPrompts.slice(0, count);
   }
   
+  // Crossover failed: retry with first theme only once
+  if (validPrompts.length === 0 && isCrossover && theme && !originalTheme) {
+    const parts = theme.split(/\s+and\s+/i);
+    if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+      console.warn(`Crossover theme "${theme}" returned no valid prompts; retrying with "${parts[0].trim()}" only.`);
+      return generatePromptsWithAI(count, usedPrompts, parts[0].trim(), theme, isAdult, false);
+    }
+  }
+
   // If all prompts were invalid (AI refused), try sanitizing the theme
-  if (validPrompts.length === 0 && theme && !originalTheme) {
+  // Skip sanitization entirely in Adult Mode (no filter at all)
+  if (validPrompts.length === 0 && theme && !originalTheme && !isAdult) {
     console.warn(`AI returned no valid prompts for theme "${theme}". Attempting to sanitize theme...`);
-    const sanitizedTheme = await sanitizeTheme(theme);
+    const sanitizedTheme = await sanitizeTheme(theme, isAdult);
     
     if (sanitizedTheme && sanitizedTheme !== theme) {
-      console.log(`Retrying with sanitized theme: "${sanitizedTheme}"`);
-      // Retry with sanitized theme, marking originalTheme to prevent infinite loops
-      return generatePromptsWithAI(count, usedPrompts, sanitizedTheme, theme);
+      // Retry with sanitized theme, marking originalTheme to prevent infinite loops.
+      // Pass isAdult through so adult behavior is preserved.
+      return generatePromptsWithAI(count, usedPrompts, sanitizedTheme, theme, isAdult, false);
     }
   }
   
@@ -359,7 +620,12 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
   // This will trigger fallback to local templates
   if (validPrompts.length === 0) {
     // Show the theme we actually tried (sanitized if applicable)
-    const displayTheme = originalTheme ? `${originalTheme} (sanitized to "${theme}")` : theme;
+    let displayTheme = theme;
+    if (originalTheme) {
+      displayTheme = `${originalTheme} (sanitized to "${theme}")`;
+    } else if (isAdult) {
+      displayTheme = `${theme} (Adult Mode - no sanitization)`;
+    }
     console.warn(`AI returned no valid prompts for theme "${displayTheme}". Falling back to local templates.`);
   }
   
@@ -372,29 +638,20 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
  * @returns {Promise<{valid: boolean, corrected: string|null, reason: string|null}>}
  */
 async function validatePrompt(prompt) {
-  const client = getAnthropicClient();
-  if (!client) {
-    // If no AI available, assume valid
+  if (!getActiveClient()) {
     return { valid: true, corrected: null, reason: null };
   }
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 256,
-      messages: [
-        {
-          role: 'user',
-          content: `Check this QuipWits game prompt for typos, grammar issues, or if it doesn't make sense:
+    const responseText = await callAI({
+      system: 'You are a helpful assistant that validates party game prompts for grammar and clarity.',
+      userContent: `Check this QuipWits game prompt for typos, grammar issues, or if it doesn't make sense:
 "${prompt}"
 
 Respond in JSON format:
-{"valid": true/false, "corrected": "corrected version if invalid, null if valid", "reason": "brief explanation if invalid, null if valid"}`
-        }
-      ],
+{"valid": true/false, "corrected": "corrected version if invalid, null if valid", "reason": "brief explanation if invalid, null if valid"}`,
+      maxTokens: 256
     });
-
-    const responseText = message.content[0].text;
     // Try to parse JSON response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -406,6 +663,43 @@ Respond in JSON format:
     console.error('Prompt validation error:', error.message);
     return { valid: true, corrected: null, reason: null };
   }
+}
+
+/**
+ * Generate unique adult prompts using adult templates
+ * Separate from standard prompts to maintain distinction
+ */
+function generateUniqueAdultPrompts(count, usedPrompts = new Set()) {
+  const prompts = [];
+  const maxAttempts = count * 10;
+  let attempts = 0;
+  
+  const adultTemplates = adultPromptData.templates.length > 0 
+    ? adultPromptData.templates 
+    : promptData.templates; // fallback
+  
+  const adultFillWords = adultPromptData.fillWords || promptData.fillWords;
+  
+  while (prompts.length < count && attempts < maxAttempts) {
+    attempts++;
+    
+    const template = adultTemplates[Math.floor(Math.random() * adultTemplates.length)];
+    const prompt = generatePrompt(template, adultFillWords);
+    
+    if (!usedPrompts.has(prompt) && !prompts.includes(prompt)) {
+      prompts.push(prompt);
+      usedPrompts.add(prompt);
+    }
+  }
+  
+  // Fill remaining if needed
+  while (prompts.length < count) {
+    const template = adultTemplates[Math.floor(Math.random() * adultTemplates.length)];
+    const prompt = generatePrompt(template, adultFillWords);
+    prompts.push(prompt);
+  }
+  
+  return prompts;
 }
 
 /**
@@ -449,20 +743,59 @@ function generateUniquePrompts(count, usedPrompts = new Set()) {
  * @param {number} count - Number of prompts to generate
  * @param {Set} usedPrompts - Set of already used prompt strings
  * @param {boolean} useAI - Whether to use AI for generation (default: true)
- * @param {string|null} theme - Optional theme for themed prompts
+ * @param {string|string[]|null} themeOrThemes - Optional theme(s); array enables multi-theme mixing
  * @returns {Promise<Array>} Array of unique prompt strings
  */
-async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI = true, theme = null) {
+async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI = true, themeOrThemes = null, isAdult = false) {
+  const themes = normalizeThemesArg(themeOrThemes);
+  const multi = themes && themes.length >= 2;
+
   // Try AI generation first (with or without theme)
-  if (useAI && getAnthropicClient()) {
+  if (useAI && getActiveClient()) {
     try {
-      const logMessage = theme 
-        ? `Generating ${count} themed prompts for theme: "${theme}"`
-        : `Generating ${count} prompts with AI`;
-      console.log(logMessage);
-      
-      const aiPrompts = await generatePromptsWithAI(count, usedPrompts, theme);
-      
+      if (multi) {
+        const buckets = buildThemeLabelBuckets(count, themes);
+        const uniquePrompts = [];
+        for (const bucket of buckets) {
+          if (bucket.count <= 0) continue;
+          const batch = await generatePromptsWithAI(bucket.count, usedPrompts, bucket.label, null, isAdult, bucket.crossover);
+          for (const prompt of batch) {
+            if (!usedPrompts.has(prompt) && !uniquePrompts.includes(prompt)) {
+              uniquePrompts.push(prompt);
+              usedPrompts.add(prompt);
+            }
+          }
+        }
+        shuffleArray(uniquePrompts);
+        if (uniquePrompts.length >= count) {
+          return uniquePrompts.slice(0, count);
+        }
+        const needed = count - uniquePrompts.length;
+        if (needed > 0) {
+          const pick = themes[Math.floor(Math.random() * themes.length)];
+          const more = await generatePromptsWithAI(needed, usedPrompts, pick, null, isAdult, false);
+          for (const prompt of more) {
+            if (!usedPrompts.has(prompt) && !uniquePrompts.includes(prompt)) {
+              uniquePrompts.push(prompt);
+              usedPrompts.add(prompt);
+            }
+          }
+        }
+        shuffleArray(uniquePrompts);
+        if (uniquePrompts.length >= count) {
+          return uniquePrompts.slice(0, count);
+        }
+        const still = count - uniquePrompts.length;
+        const localPrompts = isAdult
+          ? generateUniqueAdultPrompts(still, usedPrompts)
+          : generateUniquePrompts(still, usedPrompts);
+        return [...uniquePrompts, ...localPrompts].slice(0, count);
+      }
+
+      const theme = themes && themes.length === 1 ? themes[0] : null;
+
+      const aiPrompts = await generatePromptsWithAI(count, usedPrompts, theme, null, isAdult, false);
+
       // Filter to unique prompts and add to used set
       const uniquePrompts = [];
       for (const prompt of aiPrompts) {
@@ -471,15 +804,15 @@ async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI 
           usedPrompts.add(prompt);
         }
       }
-      
+
       // If we got enough, return them
       if (uniquePrompts.length >= count) {
         return uniquePrompts.slice(0, count);
       }
-      
+
       // If we need more, try again with remaining count
       if (uniquePrompts.length > 0 && uniquePrompts.length < count) {
-        const morePrompts = await generatePromptsWithAI(count - uniquePrompts.length, usedPrompts, theme);
+        const morePrompts = await generatePromptsWithAI(count - uniquePrompts.length, usedPrompts, theme, null, isAdult, false);
         for (const prompt of morePrompts) {
           if (!usedPrompts.has(prompt) && !uniquePrompts.includes(prompt)) {
             uniquePrompts.push(prompt);
@@ -488,27 +821,31 @@ async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI 
           }
         }
       }
-      
+
       // If AI gave us enough, return them
       if (uniquePrompts.length >= count) {
         return uniquePrompts.slice(0, count);
       }
-      
+
       // AI didn't give us enough - fill remaining with local templates
-      console.log(`AI generated ${uniquePrompts.length}/${count} prompts, filling rest with templates...`);
+      // Use adult templates if in adult mode
       const needed = count - uniquePrompts.length;
-      const localPrompts = generateUniquePrompts(needed, usedPrompts);
+      const localPrompts = isAdult
+        ? generateUniqueAdultPrompts(needed, usedPrompts)
+        : generateUniquePrompts(needed, usedPrompts);
       return [...uniquePrompts, ...localPrompts].slice(0, count);
-      
+
     } catch (error) {
       console.error('AI prompt generation failed:', error.message);
-      console.log('Falling back to local templates...');
       // Fall through to local generation
     }
   }
-  
+
   // AI unavailable or disabled - use local template generation
-  return generateUniquePrompts(count, usedPrompts);
+  // Use adult templates if in adult mode
+  return isAdult
+    ? generateUniqueAdultPrompts(count, usedPrompts)
+    : generateUniquePrompts(count, usedPrompts);
 }
 
 /**
@@ -537,36 +874,61 @@ function generateLastLashPrompt(usedPrompts = new Set()) {
 }
 
 /**
+ * Generate a single adult Last Wit prompt
+ */
+function generateLastLashAdultPrompt(usedPrompts = new Set()) {
+  const adultTemplates = adultPromptData.templates.length > 0 
+    ? adultPromptData.templates 
+    : promptData.templates;
+  const adultFillWords = adultPromptData.fillWords || promptData.fillWords;
+  
+  const maxAttempts = 50;
+  let attempts = 0;
+  
+  while (attempts < maxAttempts) {
+    attempts++;
+    const template = adultTemplates[Math.floor(Math.random() * adultTemplates.length)];
+    const prompt = generatePrompt(template, adultFillWords);
+    
+    if (!usedPrompts.has(prompt)) {
+      usedPrompts.add(prompt);
+      return prompt;
+    }
+  }
+  
+  const template = adultTemplates[Math.floor(Math.random() * adultTemplates.length)];
+  return generatePrompt(template, adultFillWords);
+}
+
+/**
  * Generate a single prompt for Last Wit round (async with AI-first approach)
  * Uses AI for generation, falls back to local templates if AI is unavailable
  * @param {Set} usedPrompts - Set of already used prompt strings
  * @param {boolean} useAI - Whether to use AI for generation (default: true)
  * @param {string|null} theme - Optional theme for themed prompt
+ * @param {boolean} isCrossover - Mashup label for Last Wit
  * @returns {Promise<string>} A unique prompt string
  */
-async function generateLastLashPromptAsync(usedPrompts = new Set(), useAI = true, theme = null) {
+async function generateLastLashPromptAsync(usedPrompts = new Set(), useAI = true, theme = null, isAdult = false, isCrossover = false) {
   // Try AI generation first (with or without theme)
-  if (useAI && getAnthropicClient()) {
+  if (useAI && getActiveClient()) {
     try {
-      const logMessage = theme 
-        ? `Generating themed Last Wit prompt for theme: "${theme}"`
-        : 'Generating Last Wit prompt with AI';
-      console.log(logMessage);
-      
-      const aiPrompts = await generatePromptsWithAI(1, usedPrompts, theme);
+      const aiPrompts = await generatePromptsWithAI(1, usedPrompts, theme, null, isAdult, isCrossover);
       if (aiPrompts.length > 0 && !usedPrompts.has(aiPrompts[0])) {
         usedPrompts.add(aiPrompts[0]);
         return aiPrompts[0];
       }
     } catch (error) {
       console.error('AI Last Wit generation failed:', error.message);
-      console.log('Falling back to local templates...');
       // Fall through to local generation
     }
   }
   
   // AI unavailable or failed - use local template generation
-  return generateLastLashPrompt(usedPrompts);
+  // Use adult templates if in adult mode
+  return isAdult 
+    ? generateLastLashAdultPrompt(usedPrompts) 
+    : generateLastLashPrompt(usedPrompts);
 }
 
 /**
@@ -580,11 +942,19 @@ function getPromptsNeededForRound(playerCount, promptsPerPlayer = 2) {
 }
 
 /**
- * Check if AI prompt generation is available
- * @returns {boolean} True if Anthropic API key is configured
+ * Check if AI prompt generation is available for the active provider
+ * @returns {boolean} True if the active provider's API key is configured
  */
 function isAIAvailable() {
-  return !!(config.getAnthropicApiKey() || process.env.ANTHROPIC_API_KEY);
+  return config.hasActiveApiKey();
+}
+
+/**
+ * Check if adult mode is enabled (xAI only)
+ * @returns {boolean}
+ */
+function isAdultModeEnabled() {
+  return config.getAdultMode && config.getAdultMode() && config.getActiveProvider() === config.PROVIDERS.XAI;
 }
 
 /**
@@ -625,34 +995,27 @@ function generateFlashbackPrompt(usedPrompts = new Set(), theme = null) {
  * Generate a Flashback Lash prompt with AI (story completion)
  * @param {Set} usedPrompts - Set of already used prompt strings
  * @param {string|null} theme - Optional theme for themed generation
+ * @param {boolean} isCrossover - Two-theme mashup
  * @returns {Promise<object>} { prompt: string, mode: 'FLASHBACK' }
  */
-async function generateFlashbackPromptAsync(usedPrompts = new Set(), theme = null) {
-  const client = getAnthropicClient();
-  
-  if (client && theme) {
+async function generateFlashbackPromptAsync(usedPrompts = new Set(), theme = null, isCrossover = false) {
+  if (getActiveClient() && theme) {
     try {
-      console.log(`Generating themed Flashback Lash prompt for theme: "${theme}"`);
+      const crossoverLine = isCrossover
+        ? '\nHumorously combine BOTH worlds from this mashup theme in one setup. Keep it recognizable to casual fans.'
+        : '';
       
-      const message = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
-        messages: [
-          {
-            role: 'user',
-            content: `Generate ONE Flashback Lash prompt for the theme "${theme}". 
+      const prompt = (await callAI({
+        system: 'You are a comedy writer creating Flashback Lash prompts for a party game. Create engaging story setups that end on a cliffhanger with "Then..." for players to complete. Be creative and tie into the given theme authentically.',
+        userContent: `Generate ONE Flashback Lash prompt for the theme "${theme}". 
 This is a short story setup where players complete the final line.
 The story should end with "Then..." so players write what happens next.
-Make it specific to the "${theme}" universe - use characters, locations, or situations from it.
+Make it specific to the "${theme}" universe - use characters, locations, or situations from it.${crossoverLine}
 Keep it under 200 characters. Return ONLY the story setup, nothing else.
 
-Example format: "The [character] was [doing something] when [something unexpected happened]. Then..."`
-          }
-        ],
-        system: 'You are a comedy writer creating Flashback Lash prompts for a party game. Create engaging story setups that end on a cliffhanger with "Then..." for players to complete. Be creative and tie into the given theme authentically.'
-      });
-      
-      const prompt = message.content[0].text.trim();
+Example format: "The [character] was [doing something] when [something unexpected happened]. Then..."`,
+        maxTokens: 512
+      })).trim();
       if (prompt && !usedPrompts.has(prompt)) {
         usedPrompts.add(prompt);
         return {
@@ -712,53 +1075,80 @@ function generateWordLashPrompt(usedPrompts = new Set(), theme = null) {
 }
 
 /**
- * Generate an Acro Lash prompt (acronym expansion)
- * Players expand a random acronym (3-5 letters)
- * @param {Set} usedPrompts - Set of already used prompts
- * @param {string|null} theme - Optional theme
- * @returns {object} { prompt: string, letters: string[], letterCount: number, mode: 'ACRO_LASH' }
+ * Pool for Roast Lash: adult list when isAdult and non-empty, else regular; fallback chain.
  */
-function generateAcroLashPrompt(usedPrompts = new Set(), theme = null) {
-  const letterPool = promptData.acroLashLetters || 'ABCDEFGHIJKLMNOPRSTUVW';
-  
-  // Random length between 3-5 letters
-  const letterCount = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
-  
-  const letters = [];
-  while (letters.length < letterCount) {
-    const letter = letterPool[Math.floor(Math.random() * letterPool.length)];
-    // Avoid consecutive same letters
-    if (letters.length === 0 || letters[letters.length - 1] !== letter) {
-      letters.push(letter);
+function getRoastPromptPool(isAdult) {
+  const regular = promptData.roastPrompts;
+  const adult = adultPromptData.roastPrompts;
+  if (isAdult && Array.isArray(adult) && adult.length > 0) return adult;
+  if (Array.isArray(regular) && regular.length > 0) return regular;
+  if (Array.isArray(adult) && adult.length > 0) return adult;
+  return ['The meanest roast you can write:'];
+}
+
+/**
+ * Generate a Roast Lash prompt (shared roast / burn premise)
+ * @param {Set} usedPrompts - Set of already used prompts
+ * @param {string|null} theme - Unused for local pool (async AI uses theme)
+ * @param {boolean} isAdult - Use adult roast bank when true
+ * @returns {object} { prompt, mode: 'ROAST_LASH', instructions }
+ */
+function generateRoastPrompt(usedPrompts = new Set(), theme = null, isAdult = false) {
+  const pool = getRoastPromptPool(isAdult);
+  const available = pool.filter(s => !usedPrompts.has(s));
+  const pickPool = available.length > 0 ? available : pool;
+  const line = pickPool[Math.floor(Math.random() * pickPool.length)];
+  usedPrompts.add(line);
+  return {
+    prompt: line,
+    mode: LAST_WIT_MODES.ROAST_LASH,
+    instructions: 'Write your funniest roast or one-liner'
+  };
+}
+
+/**
+ * Themed Roast Lash via AI; falls back to local roast bank
+ * @param {boolean} isCrossover - Mashup theme: combine both worlds
+ */
+async function generateRoastPromptAsync(usedPrompts = new Set(), theme = null, isAdult = false, isCrossover = false) {
+  if (getActiveClient() && theme) {
+    try {
+      const crossoverLine = isCrossover
+        ? '\nHumorously combine BOTH worlds from this mashup theme in one roast premise. Keep it recognizable to casual fans.'
+        : '';
+      const systemRegular = 'You are a comedy writer for Roast Lash in a party game. Generate ONE prompt line that asks all players for a single funny roast, burn, or brutal one-liner (not a story). PG-13: edgy humor is OK; no slurs; do not instruct players to attack each other by name. Abstract or situational targets only.';
+      const systemAdult = 'You write Roast Lash prompts for an uncensored adult party game. Generate ONE prompt line asking for a raunchy, edgy roast or burn tied to the theme—like Cards Against Humanity or Quiplash adult mode. Do not instruct targeting other players by name or seat. Return only the prompt line.';
+      const prompt = (await callAI({
+        system: isAdult ? systemAdult : systemRegular,
+        userContent: `Generate ONE Roast Lash prompt for the theme "${theme}".
+The prompt must ask players for a single funny roast or brutal one-liner (not a story).
+Make it specific to the "${theme}" universe.${crossoverLine}
+Keep it under 200 characters. Return ONLY the prompt line, nothing else.`,
+        maxTokens: 256
+      })).trim();
+      if (prompt && !usedPrompts.has(prompt)) {
+        usedPrompts.add(prompt);
+        return {
+          prompt,
+          mode: LAST_WIT_MODES.ROAST_LASH,
+          instructions: 'Write your funniest roast or one-liner'
+        };
+      }
+    } catch (error) {
+      console.error('AI Roast Lash generation failed:', error.message);
     }
   }
-  
-  const letterString = letters.join('. ') + '.';
-  const promptKey = `ACRO_LASH:${letterString}`;
-  
-  // Try to avoid reused combinations
-  if (usedPrompts.has(promptKey)) {
-    return generateAcroLashPrompt(usedPrompts, theme);
-  }
-  
-  usedPrompts.add(promptKey);
-  
-  return {
-    prompt: letterString,
-    letters: letters,
-    letterCount: letterCount,
-    mode: LAST_WIT_MODES.ACRO_LASH,
-    instructions: 'Create an acronym where each letter starts a word'
-  };
+  return generateRoastPrompt(usedPrompts, theme, isAdult);
 }
 
 /**
  * Generate Last Wit prompt based on randomly selected mode
  * @param {Set} usedPrompts - Set of already used prompts
  * @param {string|null} theme - Optional theme
+ * @param {boolean} isAdult - Roast Lash bank selection
  * @returns {object} Mode-specific prompt object
  */
-function generateLastWitPrompt(usedPrompts = new Set(), theme = null) {
+function generateLastWitPrompt(usedPrompts = new Set(), theme = null, isAdult = false) {
   const mode = selectRandomLastWitMode();
   
   switch (mode) {
@@ -766,8 +1156,8 @@ function generateLastWitPrompt(usedPrompts = new Set(), theme = null) {
       return generateFlashbackPrompt(usedPrompts, theme);
     case LAST_WIT_MODES.WORD_LASH:
       return generateWordLashPrompt(usedPrompts, theme);
-    case LAST_WIT_MODES.ACRO_LASH:
-      return generateAcroLashPrompt(usedPrompts, theme);
+    case LAST_WIT_MODES.ROAST_LASH:
+      return generateRoastPrompt(usedPrompts, theme, isAdult);
     default:
       return generateFlashbackPrompt(usedPrompts, theme);
   }
@@ -778,23 +1168,26 @@ function generateLastWitPrompt(usedPrompts = new Set(), theme = null) {
  * @param {Set} usedPrompts - Set of already used prompts
  * @param {boolean} useAI - Whether to use AI generation
  * @param {string|null} theme - Optional theme
+ * @param {boolean} isCrossover - Mashup theme for Flashback AI
  * @returns {Promise<object>} Mode-specific prompt object
  */
-async function generateLastWitPromptAsync(usedPrompts = new Set(), useAI = true, theme = null) {
+async function generateLastWitPromptAsync(usedPrompts = new Set(), useAI = true, theme = null, isAdult = false, isCrossover = false) {
   const mode = selectRandomLastWitMode();
   
   switch (mode) {
     case LAST_WIT_MODES.FLASHBACK:
-      if (useAI && getAnthropicClient()) {
-        return generateFlashbackPromptAsync(usedPrompts, theme);
+      if (useAI && getActiveClient()) {
+        return generateFlashbackPromptAsync(usedPrompts, theme, isCrossover);
       }
       return generateFlashbackPrompt(usedPrompts, theme);
     case LAST_WIT_MODES.WORD_LASH:
       // Word Lash is just random letters, no AI needed
       return generateWordLashPrompt(usedPrompts, theme);
-    case LAST_WIT_MODES.ACRO_LASH:
-      // Acro Lash is just random letters, no AI needed
-      return generateAcroLashPrompt(usedPrompts, theme);
+    case LAST_WIT_MODES.ROAST_LASH:
+      if (useAI && getActiveClient()) {
+        return generateRoastPromptAsync(usedPrompts, theme, isAdult, isCrossover);
+      }
+      return generateRoastPrompt(usedPrompts, theme, isAdult);
     default:
       return generateFlashbackPrompt(usedPrompts, theme);
   }
@@ -837,47 +1230,6 @@ function validateWordLashAnswer(answer, letters) {
   return { valid: true, message: null };
 }
 
-/**
- * Validate an Acro Lash answer (soft validation, case-insensitive)
- * @param {string} answer - The player's answer
- * @param {string[]} letters - The required starting letters
- * @returns {object} { valid: boolean, message: string|null }
- */
-function validateAcroLashAnswer(answer, letters) {
-  if (!answer || !letters || letters.length === 0) {
-    return { valid: true, message: null };
-  }
-  
-  // letters is a string like "LOL", convert to array for processing
-  const lettersArray = typeof letters === 'string' ? letters.split('') : letters;
-  
-  const words = answer.trim().split(/\s+/);
-  
-  // Acro Lash requires exact word count matching letters
-  if (words.length !== lettersArray.length) {
-    return {
-      valid: false,
-      message: `Need exactly ${lettersArray.length} words for ${lettersArray.join('.')}.`
-    };
-  }
-  
-  // Check each word starts with corresponding letter (case-insensitive)
-  for (let i = 0; i < lettersArray.length; i++) {
-    const word = words[i] || '';
-    const expectedLetter = lettersArray[i].toLowerCase();
-    const actualLetter = word.charAt(0).toLowerCase();
-    
-    if (actualLetter !== expectedLetter) {
-      return {
-        valid: false,
-        message: `Word ${i + 1} should start with "${lettersArray[i]}"`
-      };
-    }
-  }
-  
-  return { valid: true, message: null };
-}
-
 module.exports = {
   generatePrompt,
   generateUniquePrompts,
@@ -888,16 +1240,22 @@ module.exports = {
   validatePrompt,
   getPromptsNeededForRound,
   isAIAvailable,
+  isAdultModeEnabled,
   reinitializeClient,
   promptData,
+  parseThemes,
+  buildThemeLabelBuckets,
+  pickRandomThemeLabel,
   // Last Wit mode functions
   selectRandomLastWitMode,
   generateFlashbackPrompt,
   generateFlashbackPromptAsync,
   generateWordLashPrompt,
-  generateAcroLashPrompt,
+  generateRoastPrompt,
+  generateRoastPromptAsync,
   generateLastWitPrompt,
   generateLastWitPromptAsync,
   validateWordLashAnswer,
-  validateAcroLashAnswer
+  generateUniqueAdultPrompts,
+  generateLastLashAdultPrompt
 };

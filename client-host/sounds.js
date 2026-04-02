@@ -61,9 +61,8 @@ const SoundManager = {
       // Clone the audio to allow overlapping sounds
       const clone = sound.cloneNode();
       clone.volume = this.volume;
-      clone.play().catch(err => {
+      clone.play().catch(() => {
         // Ignore autoplay errors (user hasn't interacted yet)
-        console.log('Sound play blocked:', err.message);
       });
     } else {
       console.warn(`Sound "${name}" not found`);
@@ -95,9 +94,7 @@ const SoundManager = {
   // Background music controls
   playMusic() {
     if (!this.musicEnabled || !this.music) return;
-    this.music.play().catch(err => {
-      console.log('Music play blocked:', err.message);
-    });
+    this.music.play().catch(() => {});
   },
 
   stopMusic() {
@@ -115,9 +112,7 @@ const SoundManager = {
 
   resumeMusic() {
     if (this.musicEnabled && this.music) {
-      this.music.play().catch(err => {
-        console.log('Music play blocked:', err.message);
-      });
+      this.music.play().catch(() => {});
     }
   },
 

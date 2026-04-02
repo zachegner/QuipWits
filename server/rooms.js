@@ -44,6 +44,7 @@ function createRoom(hostSocketId, hostId) {
     timerEndTime: null,
     remainingTimeOnPause: null,  // Seconds remaining when paused
     pausedInState: null,         // Game state when paused (for callback restoration)
+    adultMode: false,
     createdAt: Date.now()
   };
   rooms.set(code, room);

@@ -1,0 +1,82 @@
+{
+  "templates": [
+    "The worst thing to say during sex with your {person}",
+    "A terrible name for your {adjective} OnlyFans account",
+    "Something you shouldn't moan in your partner's ear",
+    "The worst {noun} to use as a safe word",
+    "A rejected Tinder bio: '{adjective} {noun} enthusiast'",
+    "The most awkward thing to have on your browser history",
+    "Something your {person} would never admit in bed",
+    "A bad excuse for a hickey: '{adjective} {noun} accident'",
+    "The worst thing to whisper at a family dinner",
+    "Something that sounds dirty but is actually about {noun}",
+    "A terrible {noun} to bring to a threesome",
+    "The worst pickup line that would actually work on you",
+    "Something you'd regret sending at 2am",
+    "A bad name for a strip club in your hometown",
+    "The most embarrassing text your mom could find",
+    "Something you shouldn't do while {activity}",
+    "A rejected porn title: '{adjective} {noun} Chronicles'",
+    "The worst thing to yell during an orgasm",
+    "Something your boss shouldn't know about your {noun}",
+    "A terrible {adjective} fetish you have",
+    "The worst {noun} to use during foreplay",
+    "Something that would ruin a first date instantly",
+    "A bad {noun} related to your ex",
+    "The most cringe thing in your search history",
+    "Something you shouldn't say to your {person}'s parents",
+    "A rejected sex toy name: the {adjective} {noun}",
+    "The worst thing to find in your partner's phone",
+    "Something that makes {activity} awkward as hell",
+    "A terrible way to end a {event}",
+    "The most inappropriate {noun} for a work meeting"
+  ],
+  "fillWords": {
+    "noun": [
+      "dildo", "vibrator", "condom", "thong", "lingerie", "orgasm", "boner",
+      "booty", "tits", "ass", "cock", "pussy", "blowjob", "handjob", "sexting",
+      "hooker", "stripper", "milf", "daddy", "mommy", "fetish", "kink",
+      "toy", "lube", "plug", "strap-on", "handcuffs", "whip", "spank"
+    ],
+    "adjective": [
+      "horny", "wet", "hard", "throbbing", "moist", "slutty", "kinky",
+      "pervy", "nasty", "dirty", "filthy", "raunchy", "lewd", "explicit",
+      "suggestive", "provocative", "erotic", "sensual", "steamy", "juicy"
+    ],
+    "person": [
+      "ex", "boss", "therapist", "mother-in-law", "neighbor", "uber driver",
+      "teacher", "landlord", "coworker", "best friend", "roommate", "crush"
+    ],
+    "place": [
+      "church", "office", "funeral", "family dinner", "work meeting", "classroom"
+    ],
+    "event": [
+      "wedding", "funeral", "job interview", "family reunion", "first date"
+    ],
+    "activity": [
+      "sex", "masturbating", "fucking", "cumming", "giving head", "sexting"
+    ]
+  },
+  "roastPrompts": [
+    "The worst dirty talk to try on a first date:",
+    "A brutal roast of your ex's new partner (imaginary):",
+    "The meanest thing to moan that would kill the mood:",
+    "Your savage review of someone's nudes (hypothetical):",
+    "The pettiest insult after bad head:",
+    "A harsh truth about your browser's incognito history:",
+    "The worst safe word anyone could pick:",
+    "Your roast of a terrible strip club name:",
+    "The meanest thing to say mid-threesome:",
+    "A brutal line about someone's OnlyFans pitch:",
+    "The coldest burn for a selfish lover:",
+    "Your savage take on their performance last night:",
+    "The worst thing to whisper at a family dinner after a hookup:",
+    "A harsh roast of dating app bios:",
+    "The meanest nickname for their junk:",
+    "Your brutal review of drunk texts:",
+    "The pettiest insult about bedroom stamina:",
+    "A savage roast of morning-after awkwardness:",
+    "The worst thing to say when caught with someone else's toy:",
+    "Your harsh truth about their technique:"
+  ]
+}

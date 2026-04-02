@@ -57,53 +57,70 @@ app.get('/play', (req, res) => {
 // API Routes for configuration
 app.get('/api/config/status', (req, res) => {
   res.json({
-    hasApiKey: config.hasAnthropicApiKey(),
-    aiAvailable: promptGenerator.isAIAvailable()
+    hasApiKey: config.hasActiveApiKey(),
+    aiAvailable: promptGenerator.isAIAvailable(),
+    provider: config.getActiveProvider(),
+    adultMode: config.getAdultMode()
   });
 });
 
 app.post('/api/config/apikey', (req, res) => {
-  const { apiKey, persist = true } = req.body;
+  const { apiKey, persist = true, provider, adultMode } = req.body;
   
   if (!apiKey) {
     return res.status(400).json({ success: false, error: 'API key is required' });
   }
-  
-  if (!apiKey.startsWith('sk-ant-')) {
-    return res.status(400).json({ success: false, error: 'Invalid API key format' });
+
+  const activeProvider = provider || config.getActiveProvider();
+
+  if (activeProvider === config.PROVIDERS.ANTHROPIC && !apiKey.startsWith('sk-ant-')) {
+    return res.status(400).json({ success: false, error: 'Invalid Anthropic API key format. Keys start with "sk-ant-"' });
+  }
+
+  if (activeProvider === config.PROVIDERS.XAI && !apiKey.startsWith('xai-')) {
+    return res.status(400).json({ success: false, error: 'Invalid xAI API key format. Keys start with "xai-"' });
   }
   
   try {
-    config.setAnthropicApiKey(apiKey, persist);
-    // Reinitialize the prompt generator's client
+    config.setProviderApiKey(activeProvider, apiKey, persist);
+    if (typeof adultMode !== 'undefined') {
+      config.setAdultMode(adultMode, persist);
+    }
     promptGenerator.reinitializeClient?.();
-    res.json({ success: true });
+    res.json({ success: true, provider: activeProvider, adultMode: config.getAdultMode() });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 app.post('/api/config/test', async (req, res) => {
-  const { apiKey } = req.body;
+  const { apiKey, provider } = req.body;
   
-  // Use provided key or fall back to configured key
-  const keyToTest = apiKey || config.getAnthropicApiKey();
+  const activeProvider = provider || config.getActiveProvider();
+  const keyToTest = apiKey || config.getActiveApiKey();
   
   if (!keyToTest) {
     return res.json({ valid: false, error: 'No API key provided or configured' });
   }
   
   try {
-    // Quick test with Anthropic API
-    const Anthropic = require('@anthropic-ai/sdk').default;
-    const client = new Anthropic({ apiKey: keyToTest });
-    
-    await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 10,
-      messages: [{ role: 'user', content: 'Say "ok"' }]
-    });
-    
+    if (activeProvider === config.PROVIDERS.XAI) {
+      const OpenAI = require('openai');
+      const client = new OpenAI({ apiKey: keyToTest, baseURL: 'https://api.x.ai/v1' });
+      await client.chat.completions.create({
+        model: 'grok-4-1-fast-non-reasoning',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Say "ok"' }]
+      });
+    } else {
+      const Anthropic = require('@anthropic-ai/sdk').default;
+      const client = new Anthropic({ apiKey: keyToTest });
+      await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Say "ok"' }]
+      });
+    }
     res.json({ valid: true });
   } catch (error) {
     res.json({ valid: false, error: error.message });
@@ -220,8 +237,8 @@ async function startPromptPhase(roomCode) {
   rooms.updateRoomState(roomCode, GAME_STATES.PROMPT);
   
   // Assign prompts to players (use async version with AI fallback)
-  // Pass theme for themed prompt generation
-  await gameLogic.assignPromptsToPlayersAsync(room, room.theme);
+  // Pass theme and adultMode for themed/adult prompt generation
+  await gameLogic.assignPromptsToPlayersAsync(room, room.adultMode);
   
   // Notify host
   io.to(room.hostSocketId).emit(SERVER_EVENTS.PROMPT_PHASE, {
@@ -339,7 +356,7 @@ async function startLastLash(roomCode) {
   rooms.updateRoomState(roomCode, GAME_STATES.LAST_LASH);
 
   // setupLastLashAsync now returns { prompt, mode, letters, instructions }
-  const lastWitData = await gameLogic.setupLastLashAsync(room, room.theme);
+  const lastWitData = await gameLogic.setupLastLashAsync(room, room.adultMode);
   
   // Store the Last Wit data for when host continues
   room.pendingLastWitData = lastWitData;
@@ -347,7 +364,7 @@ async function startLastLash(roomCode) {
   // First, emit mode reveal to host and players for animation
   io.to(room.hostSocketId).emit(SERVER_EVENTS.LAST_WIT_MODE_REVEAL, {
     mode: lastWitData.mode,
-    allModes: ['FLASHBACK', 'WORD_LASH', 'ACRO_LASH']
+    allModes: ['FLASHBACK', 'WORD_LASH', 'ROAST_LASH']
   });
   
   // Tell players to watch the screen
@@ -581,7 +598,7 @@ io.on('connection', (socket) => {
   });
   
   // Host starts the game
-  socket.on(CLIENT_EVENTS.START_GAME, ({ roomCode, theme }) => {
+  socket.on(CLIENT_EVENTS.START_GAME, ({ roomCode, theme, adultMode }) => {
     const room = rooms.getRoom(roomCode);
     if (!room) {
       socket.emit(SERVER_EVENTS.ERROR, { message: 'Room not found' });
@@ -598,13 +615,20 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Store theme on room (trimmed to 120 chars max)
-    room.theme = theme ? theme.trim().substring(0, 120) : null;
+    // Store theme(s) and adult mode on room (comma/semicolon/newline separated → room.themes)
+    const rawTheme = theme != null && String(theme).trim() ? String(theme) : '';
+    room.themes = rawTheme ? promptGenerator.parseThemes(rawTheme) : null;
+    room.theme = room.themes && room.themes.length ? room.themes.join(', ') : null;
+    if (room.theme && room.theme.length > 400) {
+      room.theme = room.theme.substring(0, 400);
+    }
+    room.adultMode = !!adultMode && config.getActiveProvider() === config.PROVIDERS.XAI;
     
     // Notify everyone game is starting
     io.to(roomCode).emit(SERVER_EVENTS.GAME_STARTED, {
       playerCount: room.players.length,
-      theme: room.theme
+      theme: room.theme,
+      adultMode: room.adultMode
     });
     
     // Start first round after brief delay
@@ -893,12 +917,15 @@ function getNetworkAddresses() {
   return addresses;
 }
 
-// Load API key from config at startup
-const savedApiKey = config.getAnthropicApiKey();
-if (savedApiKey) {
-  process.env.ANTHROPIC_API_KEY = savedApiKey;
+// Load API keys from config at startup
+const savedAnthropicKey = config.getAnthropicApiKey();
+if (savedAnthropicKey) {
+  process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
 }
-
+const savedXaiKey = config.getXaiApiKey();
+if (savedXaiKey) {
+  process.env.XAI_API_KEY = savedXaiKey;
+}
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
@@ -919,7 +946,9 @@ server.listen(PORT, () => {
   }
   
   console.log('║');
-  console.log(`║  🤖 AI Prompts: ${config.hasAnthropicApiKey() ? 'ENABLED ✓' : 'DISABLED (no API key)'}`);
+  const activeProvider = config.getActiveProvider();
+  const providerLabel = activeProvider === config.PROVIDERS.XAI ? 'xAI' : 'Anthropic';
+  console.log(`║  🤖 AI Prompts: ${config.hasActiveApiKey() ? `ENABLED ✓ (${providerLabel})` : 'DISABLED (no API key)'}`);
   console.log(`║  📁 Config: ${config.getConfigPath()}`);
   console.log('╚════════════════════════════════════════════════════════════╝');
   console.log('');

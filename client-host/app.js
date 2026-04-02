@@ -116,12 +116,76 @@ function updateJoinUrl() {
   generateQRCode(urlToDisplay);
 }
 
+// Provider config metadata
+const PROVIDER_META = {
+  anthropic: {
+    placeholder: 'sk-ant-api...',
+    prefix: 'sk-ant-',
+    label: 'Anthropic',
+    link: 'https://console.anthropic.com/',
+    linkText: 'console.anthropic.com'
+  },
+  xai: {
+    placeholder: 'xai-...',
+    prefix: 'xai-',
+    label: 'xAI',
+    link: 'https://console.x.ai/',
+    linkText: 'console.x.ai'
+  }
+};
+
+function getSelectedProvider() {
+  const checked = document.querySelector('input[name="ai-provider"]:checked');
+  return checked ? checked.value : 'anthropic';
+}
+
+function updateProviderUI(provider) {
+  const meta = PROVIDER_META[provider] || PROVIDER_META.anthropic;
+  const input = document.getElementById('api-key-input');
+  const noteEl = document.getElementById('api-key-note');
+  const linkEl = document.getElementById('api-key-link');
+  const adultSection = document.getElementById('adult-mode-section');
+
+  if (input) input.placeholder = meta.placeholder;
+  if (noteEl && linkEl) {
+    linkEl.href = meta.link;
+    linkEl.target = '_blank';
+    linkEl.textContent = meta.linkText;
+    noteEl.childNodes[0].textContent = `Get your ${meta.label} API key at `;
+  }
+  
+  // Show adult mode toggle only for xAI
+  if (adultSection) {
+    adultSection.style.display = provider === 'xai' ? 'block' : 'none';
+  }
+}
+
 // API Key Management
 async function checkApiKeyStatus() {
   try {
     const response = await fetch('/api/config/status');
     const data = await response.json();
-    updateApiStatusUI(data.hasApiKey);
+
+    // Sync provider radio to saved provider
+    if (data.provider) {
+      const radio = document.getElementById(`provider-${data.provider}`);
+      if (radio) {
+        radio.checked = true;
+        updateProviderUI(data.provider);
+      }
+    }
+
+    updateApiStatusUI(data.hasApiKey, data.provider);
+    // Sync adult mode
+    if (data.adultMode !== undefined) {
+      const adultToggle = document.getElementById('adult-mode-toggle');
+      if (adultToggle) adultToggle.checked = data.adultMode;
+    }
+    // Sync adult mode from server
+    if (data.adultMode !== undefined) {
+      const adultToggle = document.getElementById('adult-mode-toggle');
+      if (adultToggle) adultToggle.checked = data.adultMode;
+    }
     return data.hasApiKey;
   } catch (error) {
     console.error('Error checking API status:', error);
@@ -130,8 +194,10 @@ async function checkApiKeyStatus() {
   }
 }
 
-function updateApiStatusUI(hasKey) {
+function updateApiStatusUI(hasKey, provider) {
   aiEnabled = hasKey;
+  const activeProvider = provider || getSelectedProvider();
+  const providerLabel = (PROVIDER_META[activeProvider] || PROVIDER_META.anthropic).label;
   
   // Update setup screen status
   const statusEl = document.getElementById('api-key-status');
@@ -142,7 +208,7 @@ function updateApiStatusUI(hasKey) {
     if (hasKey) {
       statusEl.classList.add('configured');
       iconEl.textContent = '✅';
-      textEl.textContent = 'API key configured - AI prompts enabled!';
+      textEl.textContent = `${providerLabel} API key configured - AI prompts enabled!`;
     } else {
       statusEl.classList.remove('configured');
       iconEl.textContent = '❌';
@@ -157,7 +223,7 @@ function updateApiStatusUI(hasKey) {
   if (lobbyBadge && lobbyText) {
     if (hasKey) {
       lobbyBadge.classList.add('enabled');
-      lobbyText.textContent = 'AI Enabled';
+      lobbyText.textContent = `AI Enabled (${providerLabel})`;
     } else {
       lobbyBadge.classList.remove('enabled');
       lobbyText.textContent = 'AI Disabled';
@@ -168,15 +234,19 @@ function updateApiStatusUI(hasKey) {
 async function saveApiKey() {
   const input = document.getElementById('api-key-input');
   const saveCheckbox = document.getElementById('save-api-key');
+  const adultToggle = document.getElementById('adult-mode-toggle');
   const apiKey = input?.value?.trim();
+  const provider = getSelectedProvider();
+  const meta = PROVIDER_META[provider] || PROVIDER_META.anthropic;
+  const adultMode = adultToggle ? adultToggle.checked : false;
   
   if (!apiKey) {
     alert('Please enter an API key');
     return;
   }
   
-  if (!apiKey.startsWith('sk-ant-')) {
-    alert('Invalid API key format. Anthropic keys start with "sk-ant-"');
+  if (!apiKey.startsWith(meta.prefix)) {
+    alert(`Invalid API key format. ${meta.label} keys start with "${meta.prefix}"`);
     return;
   }
   
@@ -185,7 +255,9 @@ async function saveApiKey() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        apiKey, 
+        apiKey,
+        provider,
+        adultMode,
         persist: saveCheckbox?.checked ?? true 
       })
     });
@@ -194,8 +266,8 @@ async function saveApiKey() {
     
     if (data.success) {
       input.value = '';
-      updateApiStatusUI(true);
-      alert('API key saved successfully!');
+      updateApiStatusUI(true, provider);
+      alert(`${meta.label} API key saved successfully!${data.adultMode ? ' Adult Mode enabled.' : ''}`);
     } else {
       alert('Failed to save API key: ' + (data.error || 'Unknown error'));
     }
@@ -207,16 +279,14 @@ async function saveApiKey() {
 
 async function testApiKey() {
   const input = document.getElementById('api-key-input');
-  const apiKey = input?.value?.trim();
-  
-  // Use entered key if available, otherwise test saved key
-  const keyToTest = apiKey || null;
+  const apiKey = input?.value?.trim() || null;
+  const provider = getSelectedProvider();
   
   try {
     const response = await fetch('/api/config/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: keyToTest })
+      body: JSON.stringify({ apiKey, provider })
     });
     
     const data = await response.json();
@@ -319,7 +389,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // If returning to an existing session, skip setup
   if (savedSession.roomCode && savedSession.hostId) {
     // Try to rejoin existing room
-    console.log('Attempting to rejoin room:', savedSession.roomCode);
     socket.emit('rejoin_host', { 
       roomCode: savedSession.roomCode, 
       hostId: savedSession.hostId 
@@ -334,6 +403,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('save-api-btn')?.addEventListener('click', saveApiKey);
   document.getElementById('test-api-btn')?.addEventListener('click', testApiKey);
   document.getElementById('toggle-api-key')?.addEventListener('click', toggleApiKeyVisibility);
+
+  // Provider radio buttons - update placeholder/hint when selection changes
+  document.querySelectorAll('input[name="ai-provider"]').forEach(radio => {
+    radio.addEventListener('change', () => updateProviderUI(radio.value));
+  });
+  
+  // Adult mode toggle listener (updates on change)
+  document.getElementById('adult-mode-toggle')?.addEventListener('change', () => {
+    // Auto-save when toggled (optional, but convenient)
+    // For now, just update when saving API key
+  });
   document.getElementById('continue-to-lobby-btn')?.addEventListener('click', () => {
     // Create room and go to lobby
     socket.emit('create_room', {});
@@ -372,7 +452,6 @@ socket.on('room_created', (data) => {
   hostId = data.hostId;
   document.getElementById('room-code').textContent = roomCode;
   saveSession();
-  console.log('Room created:', roomCode);
   // Update QR code and join URL with room code
   updateJoinUrl();
 });
@@ -439,8 +518,6 @@ socket.on('rejoin_host_success', (data) => {
       pauseBtn.classList.add('paused');
     }
   }
-  
-  console.log('Rejoined room:', roomCode, 'State:', data.state);
 });
 
 // Handle rejoin failure
@@ -469,7 +546,6 @@ socket.on('room_update', (data) => {
 });
 
 socket.on('game_started', (data) => {
-  console.log('Game started with', data.playerCount, 'players');
   gameTheme = data.theme || null;
   updateThemeDisplays();
   
@@ -551,7 +627,6 @@ socket.on('vote_matchup', (data) => {
 
 socket.on('player_voted', (data) => {
   // Could show voting progress here
-  console.log(`${data.playerName} voted`);
 });
 
 socket.on('matchup_result', (data) => {
@@ -644,7 +719,7 @@ socket.on('last_wit_mode_reveal', (data) => {
 
 /**
  * Run the slot machine style mode selection animation
- * @param {string} selectedMode - The mode that was selected (FLASHBACK, WORD_LASH, ACRO_LASH)
+ * @param {string} selectedMode - The mode that was selected (FLASHBACK, WORD_LASH, ROAST_LASH)
  * @param {string[]} allModes - All available modes for the carousel
  */
 function runModeSelectionAnimation(selectedMode, allModes) {
@@ -656,7 +731,9 @@ function runModeSelectionAnimation(selectedMode, allModes) {
   container.classList.remove('selected');
   
   // Create extended mode list for smooth spinning (repeat modes multiple times)
-  const modes = ['FLASHBACK', 'WORD_LASH', 'ACRO_LASH'];
+  const modes = (Array.isArray(allModes) && allModes.length > 0)
+    ? allModes
+    : ['FLASHBACK', 'WORD_LASH', 'ROAST_LASH'];
   const extendedModes = [];
   
   // Add enough repetitions to fill 5 seconds of spinning
@@ -665,7 +742,9 @@ function runModeSelectionAnimation(selectedMode, allModes) {
   }
   
   // Find where we want to land (somewhere in the middle of the extended array)
-  const targetIndex = extendedModes.length - modes.length + modes.indexOf(selectedMode);
+  const landAt = modes.indexOf(selectedMode);
+  const safeIdx = landAt >= 0 ? landAt : 0;
+  const targetIndex = extendedModes.length - modes.length + safeIdx;
   
   // Build the carousel HTML
   carousel.innerHTML = extendedModes.map((mode, index) => `
@@ -777,7 +856,7 @@ function getModeDisplayName(mode) {
   switch (mode) {
     case 'FLASHBACK': return 'FLASHBACK LASH';
     case 'WORD_LASH': return 'WORD LASH';
-    case 'ACRO_LASH': return 'ACRO LASH';
+    case 'ROAST_LASH': return 'ROAST LASH';
     default: return 'THE LAST WIT';
   }
 }
@@ -812,13 +891,13 @@ function showModeIntroScreen(mode) {
         <span class="example-text">T. F. N. = "Totally Fake News"</span>
       `;
       break;
-    case 'ACRO_LASH':
-      titleEl.textContent = 'ACRO LASH';
-      titleEl.className = 'phase-title mode-intro-title mode-acro';
-      descEl.textContent = 'What does this acronym stand for? Each letter starts a word!';
+    case 'ROAST_LASH':
+      titleEl.textContent = 'ROAST LASH';
+      titleEl.className = 'phase-title mode-intro-title mode-roast';
+      descEl.textContent = 'Everyone gets the same burn-worthy topic—deliver your funniest roast!';
       exampleEl.innerHTML = `
         <span class="example-label">EXAMPLE:</span>
-        <span class="example-text">L. O. L. = "Llamas On Ladders"</span>
+        <span class="example-text">"Your most brutal review of airport security:"</span>
       `;
       break;
   }
@@ -854,9 +933,9 @@ socket.on('last_lash_phase', (data) => {
         titleEl.textContent = 'WORD LASH';
         titleEl.className = 'phase-title last-lash-title mode-word';
         break;
-      case 'ACRO_LASH':
-        titleEl.textContent = 'ACRO LASH';
-        titleEl.className = 'phase-title last-lash-title mode-acro';
+      case 'ROAST_LASH':
+        titleEl.textContent = 'ROAST LASH';
+        titleEl.className = 'phase-title last-lash-title mode-roast';
         break;
       default:
         titleEl.textContent = 'THE LAST WIT';
@@ -873,17 +952,17 @@ socket.on('last_lash_phase', (data) => {
       case 'WORD_LASH':
         subtitleEl.textContent = 'Create a phrase using these starting letters!';
         break;
-      case 'ACRO_LASH':
-        subtitleEl.textContent = 'What does this acronym stand for?';
+      case 'ROAST_LASH':
+        subtitleEl.textContent = 'Bring the heat—one roast per player!';
         break;
       default:
         subtitleEl.textContent = 'Everyone answers the same prompt!';
     }
   }
   
-  // Display the prompt (letters for WORD_LASH/ACRO_LASH, story for FLASHBACK)
+  // Display the prompt (letters for WORD_LASH; full text for FLASHBACK / ROAST_LASH)
   if (promptEl) {
-    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+    if (lastWitMode === 'WORD_LASH' && lastWitLetters) {
       // Display letters prominently
       promptEl.innerHTML = `<span class="last-wit-letters">${lastWitLetters.join('. ')}.</span>`;
     } else {
@@ -916,8 +995,8 @@ socket.on('last_lash_voting', (data) => {
       case 'WORD_LASH':
         voteTitleEl.textContent = 'WORD LASH - VOTE!';
         break;
-      case 'ACRO_LASH':
-        voteTitleEl.textContent = 'ACRO LASH - VOTE!';
+      case 'ROAST_LASH':
+        voteTitleEl.textContent = 'ROAST LASH - VOTE!';
         break;
       default:
         voteTitleEl.textContent = 'PICK YOUR FAVORITE!';
@@ -927,7 +1006,7 @@ socket.on('last_lash_voting', (data) => {
   // Display prompt/letters
   const votePromptEl = document.getElementById('ll-vote-prompt');
   if (votePromptEl) {
-    if ((lastWitMode === 'WORD_LASH' || lastWitMode === 'ACRO_LASH') && lastWitLetters) {
+    if (lastWitMode === 'WORD_LASH' && lastWitLetters) {
       votePromptEl.innerHTML = `<span class="last-wit-letters">${lastWitLetters.join('. ')}.</span>`;
     } else {
       votePromptEl.textContent = data.prompt;
@@ -958,8 +1037,8 @@ socket.on('last_lash_results', (data) => {
       case 'WORD_LASH':
         resultsTitleEl.textContent = 'WORD LASH RESULTS';
         break;
-      case 'ACRO_LASH':
-        resultsTitleEl.textContent = 'ACRO LASH RESULTS';
+      case 'ROAST_LASH':
+        resultsTitleEl.textContent = 'ROAST LASH RESULTS';
         break;
       default:
         resultsTitleEl.textContent = 'LAST WIT RESULTS';
@@ -1039,7 +1118,6 @@ socket.on('game_paused', (data) => {
   if (data && data.remainingTime !== undefined) {
     updateTimer(data.remainingTime);
   }
-  console.log('Game paused with', data?.remainingTime, 'seconds remaining');
 });
 
 socket.on('game_resumed', () => {
@@ -1050,7 +1128,6 @@ socket.on('game_resumed', () => {
     pauseBtn.textContent = 'PAUSE';
     pauseBtn.classList.remove('paused');
   }
-  console.log('Game resumed');
 });
 
 // Helper functions
@@ -1080,7 +1157,9 @@ function updateStartButton() {
 function startGame() {
   const themeInput = document.getElementById('theme-input');
   const theme = themeInput?.value?.trim() || null;
-  socket.emit('start_game', { roomCode, theme });
+  const adultToggle = document.getElementById('adult-mode-toggle');
+  const adultMode = adultToggle ? adultToggle.checked : false;
+  socket.emit('start_game', { roomCode, theme, adultMode });
 }
 
 function updateThemeDisplays() {

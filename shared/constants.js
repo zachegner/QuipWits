@@ -13,7 +13,7 @@ const GAME_STATES = {
 const LAST_WIT_MODES = {
   FLASHBACK: 'FLASHBACK',   // Complete the story ending
   WORD_LASH: 'WORD_LASH',   // Create phrase from starting letters (e.g., T.F.N.)
-  ACRO_LASH: 'ACRO_LASH'    // Expand acronym (e.g., R.D.F. -> "Rabid Ducks Fight")
+  ROAST_LASH: 'ROAST_LASH'  // Shared roast / burn prompt (no letter constraint)
 };
 
 // Game Configuration

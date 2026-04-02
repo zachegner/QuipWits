@@ -7,6 +7,12 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// Supported AI providers
+const PROVIDERS = {
+  ANTHROPIC: 'anthropic',
+  XAI: 'xai'
+};
+
 // Determine config directory based on OS
 function getConfigDir() {
   const appName = 'QuipWits';
@@ -26,7 +32,10 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 // Default configuration
 const DEFAULT_CONFIG = {
+  aiProvider: PROVIDERS.ANTHROPIC,
   anthropicApiKey: '',
+  xaiApiKey: '',
+  adultMode: false,
   port: 3000,
   autoOpenBrowser: true
 };
@@ -114,12 +123,9 @@ function set(key, value) {
  * @returns {string|null} API key or null
  */
 function getAnthropicApiKey() {
-  // Environment variable takes precedence
   if (process.env.ANTHROPIC_API_KEY) {
     return process.env.ANTHROPIC_API_KEY;
   }
-  
-  // Fall back to config file
   const config = loadConfig();
   return config.anthropicApiKey || null;
 }
@@ -130,23 +136,134 @@ function getAnthropicApiKey() {
  * @param {boolean} persist - Whether to save to config file (default: true)
  */
 function setAnthropicApiKey(apiKey, persist = true) {
-  // Always set in environment for current session
   process.env.ANTHROPIC_API_KEY = apiKey;
-  
-  // Optionally persist to config file
   if (persist) {
     set('anthropicApiKey', apiKey);
   }
-  
   return true;
 }
 
 /**
- * Check if API key is configured (either env or config)
+ * Check if Anthropic API key is configured (either env or config)
  * @returns {boolean}
  */
 function hasAnthropicApiKey() {
   return !!getAnthropicApiKey();
+}
+
+/**
+ * Get the xAI API key (from config or environment)
+ * Environment variable takes precedence
+ * @returns {string|null} API key or null
+ */
+function getXaiApiKey() {
+  if (process.env.XAI_API_KEY) {
+    return process.env.XAI_API_KEY;
+  }
+  const config = loadConfig();
+  return config.xaiApiKey || null;
+}
+
+/**
+ * Set the xAI API key
+ * @param {string} apiKey - API key to save
+ * @param {boolean} persist - Whether to save to config file (default: true)
+ */
+function setXaiApiKey(apiKey, persist = true) {
+  process.env.XAI_API_KEY = apiKey;
+  if (persist) {
+    set('xaiApiKey', apiKey);
+  }
+  return true;
+}
+
+/**
+ * Check if xAI API key is configured (either env or config)
+ * @returns {boolean}
+ */
+function hasXaiApiKey() {
+  return !!getXaiApiKey();
+}
+
+/**
+ * Get the active AI provider
+ * @returns {string} provider name ('anthropic' or 'xai')
+ */
+function getActiveProvider() {
+  const config = loadConfig();
+  return config.aiProvider || PROVIDERS.ANTHROPIC;
+}
+
+/**
+ * Get adult mode setting
+ * @returns {boolean} Whether adult mode is enabled
+ */
+function getAdultMode() {
+  const config = loadConfig();
+  return !!config.adultMode;
+}
+
+/**
+ * Set adult mode setting
+ * @param {boolean} enabled - Whether to enable adult mode
+ * @param {boolean} persist - Whether to save to config file (default: true)
+ */
+function setAdultMode(enabled, persist = true) {
+  if (persist) {
+    set('adultMode', !!enabled);
+  }
+  return true;
+}
+
+/**
+ * Set the active AI provider
+ * @param {string} provider - 'anthropic' or 'xai'
+ * @param {boolean} persist - Whether to save to config file (default: true)
+ */
+function setActiveProvider(provider, persist = true) {
+  if (!Object.values(PROVIDERS).includes(provider)) {
+    throw new Error(`Unknown provider: ${provider}`);
+  }
+  if (persist) {
+    set('aiProvider', provider);
+  }
+  return true;
+}
+
+/**
+ * Get the API key for the active provider
+ * @returns {string|null}
+ */
+function getActiveApiKey() {
+  const provider = getActiveProvider();
+  if (provider === PROVIDERS.XAI) {
+    return getXaiApiKey();
+  }
+  return getAnthropicApiKey();
+}
+
+/**
+ * Check if the active provider has an API key configured
+ * @returns {boolean}
+ */
+function hasActiveApiKey() {
+  return !!getActiveApiKey();
+}
+
+/**
+ * Set API key for a given provider and optionally switch active provider
+ * @param {string} provider - 'anthropic' or 'xai'
+ * @param {string} apiKey - API key
+ * @param {boolean} persist - Whether to persist to config file
+ */
+function setProviderApiKey(provider, apiKey, persist = true) {
+  if (provider === PROVIDERS.XAI) {
+    setXaiApiKey(apiKey, persist);
+  } else {
+    setAnthropicApiKey(apiKey, persist);
+  }
+  setActiveProvider(provider, persist);
+  return true;
 }
 
 /**
@@ -165,6 +282,7 @@ function clearCache() {
 }
 
 module.exports = {
+  PROVIDERS,
   loadConfig,
   saveConfig,
   get,
@@ -172,6 +290,16 @@ module.exports = {
   getAnthropicApiKey,
   setAnthropicApiKey,
   hasAnthropicApiKey,
+  getXaiApiKey,
+  setXaiApiKey,
+  hasXaiApiKey,
+  getActiveProvider,
+  setActiveProvider,
+  getActiveApiKey,
+  hasActiveApiKey,
+  setProviderApiKey,
+  getAdultMode,
+  setAdultMode,
   getConfigPath,
   getConfigDir,
   clearCache,
