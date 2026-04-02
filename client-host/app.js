@@ -10,6 +10,8 @@ let timerDuration = 0;
 let isPaused = false;
 let currentGameState = 'LOBBY';
 let gameTheme = null;
+const MAX_THEME_CHIPS = 6;
+let lobbyThemeChips = [];
 let aiEnabled = false;
 let joinUrl = null;
 let lastWitMode = null;
@@ -422,6 +424,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Lobby event listeners
   document.getElementById('start-btn').addEventListener('click', startGame);
+  setupLobbyThemeChips();
   document.getElementById('new-game-btn').addEventListener('click', () => {
     window.location.reload();
   });
@@ -1154,9 +1157,91 @@ function updateStartButton() {
   }
 }
 
+function renderLobbyThemeChips() {
+  const root = document.getElementById('theme-chips');
+  if (!root) return;
+  root.innerHTML = '';
+  lobbyThemeChips.forEach((text, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'theme-chip';
+    const label = document.createElement('span');
+    label.className = 'theme-chip-text';
+    label.textContent = text;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'theme-chip-remove';
+    btn.setAttribute('aria-label', `Remove ${text}`);
+    btn.textContent = '\u00D7';
+    btn.addEventListener('click', () => {
+      lobbyThemeChips.splice(i, 1);
+      renderLobbyThemeChips();
+    });
+    chip.appendChild(label);
+    chip.appendChild(btn);
+    root.appendChild(chip);
+  });
+}
+
+function tryAddLobbyThemeChip(raw) {
+  const t = raw.trim().substring(0, 40);
+  if (!t) return;
+  if (lobbyThemeChips.length >= MAX_THEME_CHIPS) return;
+  const lower = t.toLowerCase();
+  if (lobbyThemeChips.some(x => x.toLowerCase() === lower)) return;
+  lobbyThemeChips.push(t);
+  renderLobbyThemeChips();
+}
+
+function setupLobbyThemeChips() {
+  const input = document.getElementById('theme-chip-input');
+  const wrap = document.getElementById('theme-chips-wrap');
+  if (!input || !wrap) return;
+
+  input.addEventListener('input', () => {
+    let v = input.value;
+    if (!v.includes(',')) return;
+    const parts = v.split(',');
+    const tail = parts.pop() ?? '';
+    for (const p of parts) tryAddLobbyThemeChip(p);
+    input.value = tail;
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      tryAddLobbyThemeChip(input.value);
+      input.value = '';
+    }
+    if (e.key === 'Backspace' && !input.value && lobbyThemeChips.length) {
+      lobbyThemeChips.pop();
+      renderLobbyThemeChips();
+    }
+  });
+
+  input.addEventListener('paste', (e) => {
+    const text = e.clipboardData?.getData('text') || '';
+    if (/[,\n\r]/.test(text)) {
+      e.preventDefault();
+      const parts = text.split(/[,\n\r]+/);
+      const last = parts.pop() ?? '';
+      for (const p of parts) tryAddLobbyThemeChip(p);
+      input.value = last.trim();
+    }
+  });
+
+  wrap.addEventListener('click', () => input.focus());
+}
+
+function getLobbyThemeString() {
+  const input = document.getElementById('theme-chip-input');
+  const draft = input?.value?.trim() || '';
+  const parts = [...lobbyThemeChips];
+  if (draft) parts.push(draft.substring(0, 40));
+  return parts.length ? parts.join(', ') : null;
+}
+
 function startGame() {
-  const themeInput = document.getElementById('theme-input');
-  const theme = themeInput?.value?.trim() || null;
+  const theme = getLobbyThemeString();
   const adultToggle = document.getElementById('adult-mode-toggle');
   const adultMode = adultToggle ? adultToggle.checked : false;
   socket.emit('start_game', { roomCode, theme, adultMode });

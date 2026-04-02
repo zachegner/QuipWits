@@ -127,8 +127,11 @@
       
       <div class="host-controls" id="lobby-controls">
         <div class="theme-input-container">
-          <label for="theme-input" class="theme-label">GAME THEME(S) (optional)</label>
-          <input type="text" id="theme-input" class="theme-input" placeholder="Comma-separated: e.g. Star Wars, The Office, cooking" maxlength="360">
+          <label for="theme-chip-input" class="theme-label">GAME THEME(S) (optional)</label>
+          <div class="theme-chips-wrap" id="theme-chips-wrap">
+            <div class="theme-chips" id="theme-chips" aria-live="polite"></div>
+            <input type="text" id="theme-chip-input" class="theme-chip-input" placeholder="e.g. Star Wars, The Office, cooking" maxlength="40" autocomplete="off" enterkeyhint="done">
+          </div>
         </div>
         <button id="settings-btn" class="control-btn secondary">⚙️ SETTINGS</button>
         <div class="ai-status-badge" id="lobby-ai-status">

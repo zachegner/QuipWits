@@ -415,7 +415,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  max-width: 500px;
+  max-width: 680px;
 }
 
 .theme-label {
@@ -425,31 +425,99 @@ body {
   letter-spacing: 0.2em;
 }
 
-.theme-input {
+.theme-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
   width: 100%;
-  padding: 0.8rem 1.2rem;
+  min-height: 3.1rem;
+  padding: 0.55rem 0.75rem;
   font-family: 'Orbitron', sans-serif;
   font-size: 1rem;
   background: rgba(191, 0, 255, 0.1);
   border: 2px solid var(--neon-purple);
   border-radius: 8px;
   color: var(--text-white);
-  text-align: center;
   transition: all 0.3s ease;
 }
 
-.theme-input::placeholder {
-  color: var(--text-gray);
-  opacity: 0.7;
-}
-
-.theme-input:focus {
-  outline: none;
+.theme-chips-wrap:focus-within {
   border-color: var(--neon-pink);
-  box-shadow: 
+  box-shadow:
     0 0 10px var(--neon-pink),
     0 0 20px rgba(255, 0, 255, 0.3);
   background: rgba(255, 0, 255, 0.1);
+}
+
+.theme-chips {
+  display: contents;
+}
+
+.theme-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  color: var(--text-white);
+  background: rgba(191, 0, 255, 0.35);
+  border: 1px solid var(--neon-pink);
+  border-radius: 999px;
+  box-shadow: 0 0 6px rgba(255, 0, 255, 0.25);
+}
+
+.theme-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14rem;
+}
+
+.theme-chip-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--neon-cyan);
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.theme-chip-remove:hover {
+  background: rgba(255, 68, 68, 0.45);
+  color: #fff;
+}
+
+.theme-chip-input {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+  margin: 0;
+  padding: 0.35rem 0.25rem;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text-white);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: left;
+}
+
+.theme-chip-input::placeholder {
+  color: var(--text-gray);
+  opacity: 0.75;
 }
 
 /* Theme display during game */
