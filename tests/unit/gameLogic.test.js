@@ -766,21 +766,20 @@ describe('Game Logic', () => {
       }
     });
 
-    test('LL-016: setupLastLash includes letters for Acro Lash', () => {
-      // Run multiple times to hit Acro Lash mode
-      let acroLashResult = null;
-      for (let i = 0; i < 30; i++) {
+    test('LL-016: setupLastLash has no letters for Roast Lash', () => {
+      let roastLashResult = null;
+      for (let i = 0; i < 40; i++) {
         const result = gameLogic.setupLastLash(room);
-        if (result.mode === LAST_WIT_MODES.ACRO_LASH) {
-          acroLashResult = result;
+        if (result.mode === LAST_WIT_MODES.ROAST_LASH) {
+          roastLashResult = result;
           break;
         }
       }
-      
-      if (acroLashResult) {
-        expect(acroLashResult.letters).toBeDefined();
-        expect(acroLashResult.letters.length).toBeGreaterThanOrEqual(3);
-        expect(acroLashResult.letters.length).toBeLessThanOrEqual(5);
+
+      if (roastLashResult) {
+        expect(roastLashResult.letters == null || roastLashResult.letters === undefined).toBe(true);
+        expect(typeof roastLashResult.prompt).toBe('string');
+        expect(roastLashResult.prompt.length).toBeGreaterThan(0);
       }
     });
 
@@ -828,19 +827,18 @@ describe('Game Logic', () => {
       expect(room.lastLashAnswers.length).toBe(1);
     });
 
-    test('LL-020: submitLastLashAnswer accepts Acro Lash with soft validation', () => {
-      // Force room to Acro Lash mode
-      room.lastLashMode = LAST_WIT_MODES.ACRO_LASH;
-      room.lastLashLetters = 'LOL';
-      room.lastLashPrompt = 'What does LOL stand for?';
+    test('LL-020: submitLastLashAnswer accepts Roast Lash without letter validation', () => {
+      room.lastLashMode = LAST_WIT_MODES.ROAST_LASH;
+      room.lastLashLetters = null;
+      room.lastLashPrompt = 'Your worst roast of Monday mornings:';
       room.lastLashAnswers = [];
       room.lastLashVotes = new Map();
 
-      // Submit answer that doesn't match letters (soft validation should still accept)
-      const result = gameLogic.submitLastLashAnswer(room, 'player_0', 'Wrong Answer');
+      const result = gameLogic.submitLastLashAnswer(room, 'player_0', 'Any one-liner goes');
 
       expect(result.success).toBe(true);
       expect(room.lastLashAnswers.length).toBe(1);
+      expect(room.lastLashAnswers[0].validationWarning == null).toBe(true);
     });
   });
 

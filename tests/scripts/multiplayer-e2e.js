@@ -65,7 +65,7 @@ function voteStrategy(playerIndex, playerId, matchup, round, matchupIndex) {
 
 /**
  * Last Lash answers: mode-appropriate unique string per player.
- * Tests all three LAST_WIT_MODES (FLASHBACK, WORD_LASH, ACRO_LASH).
+ * Tests all three LAST_WIT_MODES (FLASHBACK, WORD_LASH, ROAST_LASH).
  */
 function lastLashAnswerStrategy(playerIndex, promptData) {
   const p = playerIndex + 1;
@@ -73,7 +73,7 @@ function lastLashAnswerStrategy(playerIndex, promptData) {
 
   if (mode === 'FLASHBACK') return `And they all laughed forever, said Player${p}`;
   if (mode === 'WORD_LASH')  return `Totally Funny Night ${p}`;
-  if (mode === 'ACRO_LASH')  return `Really Daring Fool ${p}`;
+  if (mode === 'ROAST_LASH')  return `Roast line from Player${p}`;
   return `Last Lash answer from Player${p}`;
 }
 

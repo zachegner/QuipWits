@@ -45,8 +45,8 @@ function lastLashAnswerStrategy(playerIndex, promptData, phase) {
     return `And they lived happily ever after, Player${playerIndex + 1} style`;
   } else if (mode === 'WORD_LASH') {
     return `The Final Night ${playerIndex + 1}`;
-  } else if (mode === 'ACRO_LASH') {
-    return `Rabid Ducks Fight ${playerIndex + 1}`;
+  } else if (mode === 'ROAST_LASH') {
+    return `Savage roast ${playerIndex + 1}`;
   }
   
   return `Last Lash answer from Player${playerIndex + 1}`;

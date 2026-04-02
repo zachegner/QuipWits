@@ -215,6 +215,31 @@ class GameSimulator {
       socket.on(SERVER_EVENTS.ERROR, (data) => {
         this.log('error', `Player ${index + 1}: Error`, data);
       });
+
+      // When running without a host socket, player 0 fills in as the resolver
+      // for host-addressed events that the server also broadcasts to players.
+      if (!this.hostSocket && index === 0) {
+        socket.on(SERVER_EVENTS.ROUND_SCORES, (data) => {
+          this.log('info', 'Bot0: Round scores received', data.scoreboard);
+          this.resolveEvent(SERVER_EVENTS.ROUND_SCORES, data);
+        });
+
+        socket.on(SERVER_EVENTS.LAST_WIT_MODE_REVEAL, (data) => {
+          this.log('info', 'Bot0: Last Wit mode reveal', data.mode);
+          this.resolveEvent(SERVER_EVENTS.LAST_WIT_MODE_REVEAL, data);
+        });
+
+        socket.on(SERVER_EVENTS.LAST_LASH_RESULTS, (data) => {
+          this.log('info', 'Bot0: Last Lash results received');
+          this.resolveEvent(SERVER_EVENTS.LAST_LASH_RESULTS, data);
+        });
+
+        socket.on(SERVER_EVENTS.GAME_OVER, (data) => {
+          this.log('info', 'Bot0: Game over (resolver)');
+          this.finalResults = data;
+          this.resolveEvent(SERVER_EVENTS.GAME_OVER, data);
+        });
+      }
     });
   }
 
@@ -273,11 +298,11 @@ class GameSimulator {
     return data;
   }
 
-  async joinPlayers() {
+  async joinPlayers(names = null) {
     this.log('info', 'Joining players to room...');
     
     for (let i = 0; i < this.playerCount; i++) {
-      const playerName = `Player${i + 1}`;
+      const playerName = (names && names[i]) ? names[i] : `Player${i + 1}`;
       this.playerSockets[i].emit(CLIENT_EVENTS.JOIN_ROOM, {
         roomCode: this.roomCode,
         playerName
@@ -434,19 +459,26 @@ class GameSimulator {
     return modeRevealPromise;
   }
 
-  async handleLastLash(answerStrategy, voteStrategy, modeRevealPromise) {
+  async handleLastLash(answerStrategy, voteStrategy, modeRevealPromise, { emitHostContinue = true } = {}) {
     this.log('info', '=== Last Lash Phase ===');
-    
+
+    // Register the prompt waiter BEFORE awaiting mode reveal so we never miss
+    // the event when the human host clicks Continue (bots-only path) or when
+    // our host socket emits CONTINUE_LAST_WIT (fully-automated path).
+    const promptPromise = this.waitForEvent(SERVER_EVENTS.LAST_LASH_PROMPT);
+
     // Wait for mode reveal (using promise passed in)
     const modeReveal = await modeRevealPromise;
     this.log('info', `Last Wit mode: ${modeReveal.mode}`);
     await this.delay(2000);
-    
-    // Set up waiter for prompt BEFORE emitting continue event (which triggers the prompt)
-    const promptPromise = this.waitForEvent(SERVER_EVENTS.LAST_LASH_PROMPT);
-    
-    // Host continues (this triggers the prompt to be sent)
-    this.hostSocket.emit(CLIENT_EVENTS.CONTINUE_LAST_WIT, { roomCode: this.roomCode });
+
+    if (emitHostContinue) {
+      // Fully-automated path: script's host socket triggers the prompt
+      this.hostSocket.emit(CLIENT_EVENTS.CONTINUE_LAST_WIT, { roomCode: this.roomCode });
+    } else {
+      // Human path: host UI will send CONTINUE_LAST_WIT; just wait for the prompt
+      this.log('info', '  --> Click "Continue" on the host screen to start Last Lash.');
+    }
     
     // Wait for prompt (using promise we set up earlier)
     this.log('debug', 'Waiting for Last Lash prompt...');
@@ -538,6 +570,67 @@ class GameSimulator {
       };
     } catch (error) {
       this.log('error', 'Game simulation failed', error);
+      return {
+        success: false,
+        error: error.message,
+        log: this.gameLog,
+        errors: this.errors
+      };
+    } finally {
+      await this.cleanup();
+    }
+  }
+
+  /**
+   * Join an existing room as bot players only and play a full game.
+   * The human host and human player(s) must connect via the browser UI.
+   *
+   * @param {object} opts
+   * @param {string}   opts.roomCode      Room code to join (e.g. "ABCD")
+   * @param {string[]} [opts.botNames]    Names for the bots (default Bot1, Bot2, …)
+   * @param {Function} opts.answerStrategy  (playerIndex, prompt, round) => string
+   * @param {Function} opts.voteStrategy    (playerIndex, playerId, data, round, matchupIndex) => vote
+   */
+  async runBotsOnlyInRoom({ roomCode, botNames, answerStrategy, voteStrategy }) {
+    try {
+      this.roomCode = roomCode.toUpperCase();
+
+      await this.connectPlayers();
+      this.setupEventHandlers();
+
+      await this.joinPlayers(botNames);
+
+      console.log('');
+      console.log('  Bots have joined. Waiting for host to start the game...');
+      console.log('  (Start the game from the host screen when all players are listed.)');
+      console.log('');
+
+      // Round 1
+      await this.handlePromptPhase(1, answerStrategy);
+      await this.handleVotingPhase(1, voteStrategy);
+
+      // Round 2 (returns mode reveal promise after the final round)
+      await this.handlePromptPhase(2, answerStrategy);
+      const modeRevealPromise = await this.handleVotingPhase(2, voteStrategy);
+
+      // Last Lash — human host clicks Continue; bots don't emit CONTINUE_LAST_WIT
+      const gameOver = await this.handleLastLash(
+        answerStrategy,
+        voteStrategy,
+        modeRevealPromise,
+        { emitHostContinue: false }
+      );
+
+      this.log('info', '=== Game Complete ===');
+
+      return {
+        success: true,
+        results: gameOver,
+        log: this.gameLog,
+        errors: this.errors
+      };
+    } catch (error) {
+      this.log('error', 'Bot game failed', error);
       return {
         success: false,
         error: error.message,

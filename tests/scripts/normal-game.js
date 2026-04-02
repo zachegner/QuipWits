@@ -40,9 +40,8 @@ function lastLashAnswerStrategy(playerIndex, promptData, phase) {
     // Use the letters if provided
     const letters = promptData.letters || 'T.F.N.';
     return `The Final Night`;
-  } else if (mode === 'ACRO_LASH') {
-    const letters = promptData.letters || 'R.D.F.';
-    return `Rabid Ducks Fight`;
+  } else if (mode === 'ROAST_LASH') {
+    return `Roast answer from Player${playerIndex + 1}`;
   }
   
   return `Last Lash answer from Player${playerIndex + 1}`;

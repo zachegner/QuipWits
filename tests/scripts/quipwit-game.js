@@ -37,9 +37,8 @@ function lastLashAnswerStrategy(playerIndex, promptData, phase) {
   } else if (mode === 'WORD_LASH') {
     const letters = promptData.letters || 'T.F.N.';
     return `The Final Night ${playerIndex + 1}`;
-  } else if (mode === 'ACRO_LASH') {
-    const letters = promptData.letters || 'R.D.F.';
-    return `Rabid Ducks Fight ${playerIndex + 1}`;
+  } else if (mode === 'ROAST_LASH') {
+    return `Savage roast ${playerIndex + 1}`;
   }
   
   return `Last Lash answer from Player${playerIndex + 1}`;
