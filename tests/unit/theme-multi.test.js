@@ -31,23 +31,25 @@ describe('parseThemes', () => {
 describe('buildThemeLabelBuckets', () => {
   test('single theme gets one bucket', () => {
     const b = buildThemeLabelBuckets(4, ['Only']);
-    expect(b).toEqual([{ label: 'Only', count: 4, crossover: false }]);
+    expect(b).toEqual([{ label: 'Only', count: 4 }]);
   });
 
-  test('multiple themes sums to count and includes singles and combos', () => {
+  test('multiple themes: all buckets are single-theme, total sums to count', () => {
     const b = buildThemeLabelBuckets(8, ['A', 'B', 'C']);
     const sum = b.reduce((s, x) => s + x.count, 0);
     expect(sum).toBe(8);
-    const hasCrossover = b.some(x => x.crossover);
-    const hasSingle = b.some(x => !x.crossover);
-    expect(hasCrossover).toBe(true);
-    expect(hasSingle).toBe(true);
+    expect(b.every(x => !x.label.includes(' and '))).toBe(true);
+    // Round-robin: 8 prompts across 3 themes → 3, 3, 2
+    const counts = b.map(x => x.count).sort((a, z) => z - a);
+    expect(counts[0]).toBe(3);
+    expect(counts[1]).toBe(3);
+    expect(counts[2]).toBe(2);
   });
 
-  test('count 2 uses two singles only', () => {
+  test('count 2 with two themes: each theme gets one prompt', () => {
     const b = buildThemeLabelBuckets(2, ['A', 'B']);
     expect(b.reduce((s, x) => s + x.count, 0)).toBe(2);
-    expect(b.every(x => !x.crossover)).toBe(true);
+    expect(b.every(x => !x.label.includes(' and '))).toBe(true);
   });
 });
 
@@ -57,9 +59,17 @@ describe('pickRandomThemeLabel', () => {
     expect(pickRandomThemeLabel([]).label).toBeNull();
   });
 
-  test('one theme is never crossover', () => {
+  test('one theme returns that theme', () => {
     const r = pickRandomThemeLabel(['Solo']);
     expect(r.label).toBe('Solo');
-    expect(r.crossover).toBe(false);
+  });
+
+  test('multiple themes always returns a single theme label (no mashup)', () => {
+    const themes = ['A', 'B', 'C'];
+    for (let i = 0; i < 20; i++) {
+      const r = pickRandomThemeLabel(themes);
+      expect(themes).toContain(r.label);
+      expect(r.label).not.toMatch(/ and /);
+    }
   });
 });

@@ -474,16 +474,14 @@ async function setupLastLashAsync(room, isAdult = false) {
     room.usedPrompts = new Set();
   }
   
-  const { label: themeLabel, crossover } = pickRandomThemeLabel(room.themes);
-  const themeForLastWit = themeLabel;
+  const { label: themeLabel } = pickRandomThemeLabel(room.themes);
   
   // Generate Last Wit prompt with random mode selection and AI support
   const lastWitData = await generateLastWitPromptAsync(
     room.usedPrompts,
     true,
-    themeForLastWit,
-    isAdult || room.adultMode,
-    crossover
+    themeLabel,
+    isAdult || room.adultMode
   );
   
   room.lastLashPrompt = lastWitData.prompt;

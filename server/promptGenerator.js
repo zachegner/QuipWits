@@ -78,78 +78,41 @@ function parseThemes(raw) {
 }
 
 /**
- * Build batches of prompts per theme label (single-theme or crossover "A and B").
+ * Build batches of prompts per theme label, one bucket per theme (round-robin split).
  * @param {number} count
  * @param {string[]} themes
- * @returns {{ label: string, count: number, crossover: boolean }[]}
+ * @returns {{ label: string, count: number }[]}
  */
 function buildThemeLabelBuckets(count, themes) {
-  /** @type {{ label: string, count: number, crossover: boolean }[]} */
   const buckets = [];
   if (!themes || themes.length === 0) return buckets;
   if (themes.length === 1) {
-    buckets.push({ label: themes[0], count, crossover: false });
+    buckets.push({ label: themes[0], count });
     return buckets;
   }
 
-  let comboCount = 0;
-  if (count >= 4) {
-    comboCount = Math.max(1, Math.round(count * 0.32));
-  } else if (count === 3) {
-    comboCount = 1;
-  }
-  if (count === 2) comboCount = 0;
-  comboCount = Math.min(comboCount, Math.max(0, count - 1));
-
-  const singleTotal = count - comboCount;
   const perTheme = new Map();
   themes.forEach(t => perTheme.set(t, 0));
-  for (let i = 0; i < singleTotal; i++) {
+  for (let i = 0; i < count; i++) {
     const t = themes[i % themes.length];
     perTheme.set(t, perTheme.get(t) + 1);
   }
   for (const [label, c] of perTheme) {
-    if (c > 0) buckets.push({ label, count: c, crossover: false });
-  }
-
-  for (let k = 0; k < comboCount; k++) {
-    let i = Math.floor(Math.random() * themes.length);
-    let j = (i + 1 + Math.floor(Math.random() * (themes.length - 1))) % themes.length;
-    const label = `${themes[i]} and ${themes[j]}`;
-    const existing = buckets.find(b => b.label === label && b.crossover);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      buckets.push({ label, count: 1, crossover: true });
-    }
-  }
-
-  let sum = buckets.reduce((s, b) => s + b.count, 0);
-  if (sum !== count && buckets.length > 0) {
-    buckets[0].count += count - sum;
+    if (c > 0) buckets.push({ label, count: c });
   }
   return buckets;
 }
 
 /**
- * Pick a random single-theme or two-theme crossover label for Last Wit (Flashback AI).
+ * Pick a random single theme label for Last Wit.
  * @param {string[]|null|undefined} themes
- * @returns {{ label: string|null, crossover: boolean }}
+ * @returns {{ label: string|null }}
  */
 function pickRandomThemeLabel(themes) {
   if (!themes || themes.length === 0) {
-    return { label: null, crossover: false };
+    return { label: null };
   }
-  if (themes.length === 1) {
-    return { label: themes[0], crossover: false };
-  }
-  const useCombo = Math.random() < 0.45;
-  if (!useCombo) {
-    return { label: themes[Math.floor(Math.random() * themes.length)], crossover: false };
-  }
-  let i = Math.floor(Math.random() * themes.length);
-  let j = (i + 1 + Math.floor(Math.random() * (themes.length - 1))) % themes.length;
-  return { label: `${themes[i]} and ${themes[j]}`, crossover: true };
+  return { label: themes[Math.floor(Math.random() * themes.length)] };
 }
 
 function shuffleArray(arr) {
@@ -271,11 +234,13 @@ const AI_SYSTEM_PROMPT_BASE = `You are a hilarious comedy writer for an adult Qu
 Guidelines:
 - Prompts should be open-ended enough for creative, hilarious answers
 - This is for ADULTS at a game night - be funny, edgy, and a bit raunchy
-- Topics can include: dating, relationships, embarrassing moments, drinking, work complaints, awkward situations, adult humor, innuendos
+- Topics can span ANY area of life: work, relationships, food, travel, money, health, technology, nature, sports, school, family, aging, animals, hobbies, crime, politics, science, history, religion, fashion, weather, parenting, childhood memories, nightlife, embarrassing moments, bodily functions, and more
 - Make them absurd, surprising, provocative, or set up hilariously uncomfortable situations
 - Sexual innuendos and suggestive content are encouraged (but avoid explicit/graphic content)
 - Format: A statement or question that players complete with their answer
 - Keep prompts concise (under 100 characters ideally)
+- DO NOT default to movies, TV shows, celebrities, or pop culture franchises — those are only used when the host picks a specific theme. Keep prompts grounded in everyday life and universal human experiences.
+- Maximize variety: avoid repeating the same topic, setting, or format across prompts in a batch
 
 Example prompts:
 - "The worst thing to whisper in someone's ear on a first date"
@@ -288,20 +253,27 @@ Example prompts:
 - "The most embarrassing thing to yell during sex"
 - "A bad excuse for why you're late to work... again"
 - "What your therapist writes in their notes about you"
+- "The worst thing to find in your carry-on at airport security"
+- "What your dog is actually barking at"
+- "A terrible reason to call an ambulance"
+- "The worst thing to google right before a job interview"
+- "Something you shouldn't say at Thanksgiving dinner"
 
-Generate creative, original, adult-oriented prompts in a similar style.`;
+Generate creative, original, adult-oriented prompts in a similar style. Vary the topics widely — no two prompts in a batch should feel like they come from the same corner of life.`;
 
 // Adult mode system prompt - well-rounded like Cards Against Humanity
 // Allows edgy/sexual content but does not require every prompt to be sexual
 const ADULT_SYSTEM_PROMPT = `You are a hilarious comedy writer for an adult party game like Cards Against Humanity or Quiplash. Generate funny, edgy, provocative, cringe-worthy, dark, and taboo fill-in-the-blank prompts.
 
 Guidelines for ADULT MODE:
-- Create a good mix of humor: awkward social situations, relationships, dark comedy, bodily functions, cheating, family embarrassment, work disasters, drinking stories, and yes - sometimes sexual/risqué content
-- Not every prompt needs to be sexual. Variety is key for a fun, well-rounded game
+- Draw from ANY area of life: relationships, work, family, money, travel, food, health, aging, animals, childhood, parenting, crime, religion, sports, nature, technology, history, nightlife, bodily functions, embarrassing moments, and more
+- Not every prompt needs to be sexual. Variety across many topics is key for a fun, well-rounded game
 - Be crude, vulgar, offensive, shocking, or hilariously uncomfortable when it fits
 - Make prompts that will make players laugh, blush, gasp, or groan
 - Keep prompts concise (under 100 characters ideally) but punchy and memorable
 - Format: A statement or question that players complete with their funniest answer
+- DO NOT default to movies, TV shows, celebrities, or pop culture franchises — those are only used when the host picks a specific theme. Ground prompts in everyday life and universal human experiences.
+- Maximize variety: avoid repeating the same topic, setting, or format across prompts in a batch
 
 Example prompts:
 - "The worst thing to moan during sex with your boss"
@@ -311,18 +283,20 @@ Example prompts:
 - "What your therapist really thinks about your sex life"
 - "The worst text to accidentally send to your mom"
 - "Something that sounds dirty but is actually about your job"
+- "The last thing you want to hear from your dentist mid-procedure"
+- "A terrible reason to request bereavement leave"
+- "What the neighbors definitely heard last night"
 
-Generate creative, entertaining, boundary-pushing prompts with good variety.`;
+Generate creative, entertaining, boundary-pushing prompts with good variety across as many different topics as possible.`;
 
 /**
  * Get AI system prompt, building a theme-focused prompt when a theme is provided
  * When themed, the entire prompt is rewritten to prioritize the theme's universe,
  * characters, and humor style over generic adult party game content.
  * @param {string|null} theme - Optional theme to incorporate into prompts
- * @param {boolean} isCrossover - True when combining two distinct themes in one prompt set
  * @returns {string} The system prompt for AI generation
  */
-function getAISystemPrompt(theme = null, isAdult = false, isCrossover = false) {
+function getAISystemPrompt(theme = null, isAdult = false) {
   if (isAdult) {
     return ADULT_SYSTEM_PROMPT;
   }
@@ -331,48 +305,38 @@ function getAISystemPrompt(theme = null, isAdult = false, isCrossover = false) {
     return AI_SYSTEM_PROMPT_BASE;
   }
   
-  const crossoverBlock = isCrossover
-    ? `
-CROSSOVER: These prompts must humorously combine BOTH worlds in "${theme}" — mash up characters, settings, or tone from each side. Keep jokes simple enough that casual fans of either side can enjoy them.
-`
-    : '';
-  
-  // When a theme is provided, build a theme-focused prompt that's simple and accessible
-  // Handle both media franchises and general topics/concepts
+  // When a theme is provided, build a theme-focused prompt centered on that topic
   return `You are a hilarious comedy writer for a QuipLash-style party game. Your job is to generate funny, creative fill-in-the-blank style prompts inspired by the theme: "${theme}"
-${crossoverBlock}
+
 SIMPLICITY FIRST:
 - Prompts must be IMMEDIATELY understandable - players should "get it" on first read
-- Use well-known characters, concepts, or situations from "${theme}" that casual fans would recognize
-- Keep it simple and clear - avoid obscure references, deep lore, or complex storylines
-- The humor should be straightforward and funny, not requiring deep theme knowledge
-- Think "recognizable" not "superfan-only" - prompts should work for both fans and casual viewers
-- If "${theme}" is a general topic (not a media franchise), create prompts that playfully reference the topic in fun, accessible ways
+- Keep it simple and clear - use everyday situations, humor, and ideas that naturally connect to "${theme}"
+- The humor should be straightforward and funny, accessible to anyone who knows what "${theme}" is
+- Treat "${theme}" as a topic or setting to riff on, not as a franchise with characters to name-drop
 
 Guidelines:
 - Prompts should be open-ended enough for creative, hilarious answers
 - Format: A statement or question that players complete with their answer
 - Keep prompts concise (under 100 characters ideally)
 - Make them funny, surprising, and connected to "${theme}" in a way that's easy to understand
-- Prioritize clarity and immediate comprehension over deep references
+- Prioritize clarity and immediate comprehension over obscure references
 - ALWAYS generate actual prompts - never explain why you can't or refuse. Create fun, appropriate prompts.
 
-Examples of GOOD themed prompts (simple and accessible):
-- For "The Office": "What Michael Scott would name his autobiography"
-- For "Star Wars": "The worst thing to say to Darth Vader"
-- For "Family Guy": "Peter Griffin's worst idea ever"
-- For "Harry Potter": "The worst spell to cast by accident"
-- For "Marvel": "What Captain America writes in his diary"
-- For "cooking": "The worst thing to say to a chef"
-- For "sports": "What a coach yells when they're really frustrated"
+Examples of GOOD themed prompts (topic-driven, not franchise name-drops):
+- For "cooking": "The worst thing to say to a chef right before they plate your food"
+- For "sports": "What a coach screams when they're absolutely losing it"
+- For "camping": "The worst thing to forget on a camping trip"
+- For "dating": "The red flag you ignored on a first date"
+- For "dentists": "The last thing you want to hear while someone is drilling your tooth"
+- For "airports": "What the TSA agent is silently judging you for"
+- For "pets": "What your dog is actually barking at 3am"
 
-Examples of BAD themed prompts (too complicated or generic):
-- "What Michael Scott wrote in his diary after the Dundies" (requires knowing what Dundies are)
-- "Yoda's rejected wisdom that didn't make the Jedi training manual" (too complex)
-- "What [character] does on a first date" (too generic)
-- "[Character]'s embarrassing work moment" (doesn't use theme's actual context)
+Examples of BAD themed prompts (too generic or not tied to the theme):
+- "What [character] does on a first date" (uses a character name-drop instead of the theme)
+- "A person's embarrassing moment" (no connection to the theme at all)
+- "The worst thing ever" (completely unanchored)
 
-Generate prompts that are fun, funny, and instantly understandable. Keep them simple and accessible while still being connected to "${theme}". Always return actual prompts, never explanations or refusals.`;
+Generate prompts that are fun, funny, and instantly understandable. Root them in the everyday situations, humor, and experiences that surround "${theme}". Always return actual prompts, never explanations or refusals.`;
 }
 
 /**
@@ -551,10 +515,9 @@ Return ONLY the alternative theme (1-3 words), nothing else.`,
  * @param {string|null} theme - Optional theme for themed prompt generation
  * @param {string|null} originalTheme - The original theme if this is a sanitized attempt
  * @param {boolean} isAdult - Whether adult mode is active (skips all theme sanitization)
- * @param {boolean} isCrossover - Two-theme mashup prompts ("A and B")
  * @returns {Promise<Array>} Array of AI-generated prompt strings
  */
-async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = null, originalTheme = null, isAdult = false, isCrossover = false) {
+async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = null, originalTheme = null, isAdult = false) {
   if (!getActiveClient()) {
     throw new Error('AI client not initialized - check your API key for the selected provider');
   }
@@ -564,15 +527,12 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
     ? `\n\nAvoid these already-used prompts:\n${usedList.map(p => `- "${p}"`).join('\n')}`
     : '';
   
-  const crossoverHint = isCrossover && theme
-    ? ' Combine both worlds in each prompt in a funny, accessible way.'
-    : '';
   const themeContext = theme 
-    ? `\n\nIMPORTANT: Create prompts inspired by "${theme}" that are simple and immediately understandable. Use well-known characters or concepts that casual fans would recognize. Prioritize clarity and accessibility - players should understand the prompt on first read without needing deep theme knowledge.${crossoverHint} Always generate actual prompts, never explanations or refusals.`
+    ? `\n\nIMPORTANT: Create prompts inspired by "${theme}" that are simple and immediately understandable. Root them in the everyday situations, humor, and experiences that naturally surround "${theme}" — do not rely on named characters, franchises, or celebrity references. Always generate actual prompts, never explanations or refusals.`
     : '';
 
   const responseText = await callAI({
-    system: getAISystemPrompt(theme, isAdult, isCrossover),
+    system: getAISystemPrompt(theme, isAdult),
     userContent: `Generate exactly ${count} unique, creative QuipLash-style prompts. Return ONLY the prompts, one per line, no numbering or extra formatting.${usedContext}${themeContext}`,
     maxTokens: 1024
   });
@@ -594,15 +554,6 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
     return validPrompts.slice(0, count);
   }
   
-  // Crossover failed: retry with first theme only once
-  if (validPrompts.length === 0 && isCrossover && theme && !originalTheme) {
-    const parts = theme.split(/\s+and\s+/i);
-    if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
-      console.warn(`Crossover theme "${theme}" returned no valid prompts; retrying with "${parts[0].trim()}" only.`);
-      return generatePromptsWithAI(count, usedPrompts, parts[0].trim(), theme, isAdult, false);
-    }
-  }
-
   // If all prompts were invalid (AI refused), try sanitizing the theme
   // Skip sanitization entirely in Adult Mode (no filter at all)
   if (validPrompts.length === 0 && theme && !originalTheme && !isAdult) {
@@ -612,7 +563,7 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
     if (sanitizedTheme && sanitizedTheme !== theme) {
       // Retry with sanitized theme, marking originalTheme to prevent infinite loops.
       // Pass isAdult through so adult behavior is preserved.
-      return generatePromptsWithAI(count, usedPrompts, sanitizedTheme, theme, isAdult, false);
+      return generatePromptsWithAI(count, usedPrompts, sanitizedTheme, theme, isAdult);
     }
   }
   
@@ -630,39 +581,6 @@ async function generatePromptsWithAI(count, usedPrompts = new Set(), theme = nul
   }
   
   return validPrompts;
-}
-
-/**
- * Validate a prompt using Claude AI to check for typos and coherence
- * @param {string} prompt - The prompt to validate
- * @returns {Promise<{valid: boolean, corrected: string|null, reason: string|null}>}
- */
-async function validatePrompt(prompt) {
-  if (!getActiveClient()) {
-    return { valid: true, corrected: null, reason: null };
-  }
-
-  try {
-    const responseText = await callAI({
-      system: 'You are a helpful assistant that validates party game prompts for grammar and clarity.',
-      userContent: `Check this QuipWits game prompt for typos, grammar issues, or if it doesn't make sense:
-"${prompt}"
-
-Respond in JSON format:
-{"valid": true/false, "corrected": "corrected version if invalid, null if valid", "reason": "brief explanation if invalid, null if valid"}`,
-      maxTokens: 256
-    });
-    // Try to parse JSON response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    return { valid: true, corrected: null, reason: null };
-  } catch (error) {
-    // On error, assume valid to not block game
-    console.error('Prompt validation error:', error.message);
-    return { valid: true, corrected: null, reason: null };
-  }
 }
 
 /**
@@ -758,7 +676,7 @@ async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI 
         const uniquePrompts = [];
         for (const bucket of buckets) {
           if (bucket.count <= 0) continue;
-          const batch = await generatePromptsWithAI(bucket.count, usedPrompts, bucket.label, null, isAdult, bucket.crossover);
+          const batch = await generatePromptsWithAI(bucket.count, usedPrompts, bucket.label, null, isAdult);
           for (const prompt of batch) {
             if (!usedPrompts.has(prompt) && !uniquePrompts.includes(prompt)) {
               uniquePrompts.push(prompt);
@@ -773,7 +691,7 @@ async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI 
         const needed = count - uniquePrompts.length;
         if (needed > 0) {
           const pick = themes[Math.floor(Math.random() * themes.length)];
-          const more = await generatePromptsWithAI(needed, usedPrompts, pick, null, isAdult, false);
+          const more = await generatePromptsWithAI(needed, usedPrompts, pick, null, isAdult);
           for (const prompt of more) {
             if (!usedPrompts.has(prompt) && !uniquePrompts.includes(prompt)) {
               uniquePrompts.push(prompt);
@@ -794,7 +712,7 @@ async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI 
 
       const theme = themes && themes.length === 1 ? themes[0] : null;
 
-      const aiPrompts = await generatePromptsWithAI(count, usedPrompts, theme, null, isAdult, false);
+      const aiPrompts = await generatePromptsWithAI(count, usedPrompts, theme, null, isAdult);
 
       // Filter to unique prompts and add to used set
       const uniquePrompts = [];
@@ -812,7 +730,7 @@ async function generateUniquePromptsAsync(count, usedPrompts = new Set(), useAI 
 
       // If we need more, try again with remaining count
       if (uniquePrompts.length > 0 && uniquePrompts.length < count) {
-        const morePrompts = await generatePromptsWithAI(count - uniquePrompts.length, usedPrompts, theme, null, isAdult, false);
+        const morePrompts = await generatePromptsWithAI(count - uniquePrompts.length, usedPrompts, theme, null, isAdult);
         for (const prompt of morePrompts) {
           if (!usedPrompts.has(prompt) && !uniquePrompts.includes(prompt)) {
             uniquePrompts.push(prompt);
@@ -906,14 +824,13 @@ function generateLastLashAdultPrompt(usedPrompts = new Set()) {
  * @param {Set} usedPrompts - Set of already used prompt strings
  * @param {boolean} useAI - Whether to use AI for generation (default: true)
  * @param {string|null} theme - Optional theme for themed prompt
- * @param {boolean} isCrossover - Mashup label for Last Wit
  * @returns {Promise<string>} A unique prompt string
  */
-async function generateLastLashPromptAsync(usedPrompts = new Set(), useAI = true, theme = null, isAdult = false, isCrossover = false) {
+async function generateLastLashPromptAsync(usedPrompts = new Set(), useAI = true, theme = null, isAdult = false) {
   // Try AI generation first (with or without theme)
   if (useAI && getActiveClient()) {
     try {
-      const aiPrompts = await generatePromptsWithAI(1, usedPrompts, theme, null, isAdult, isCrossover);
+      const aiPrompts = await generatePromptsWithAI(1, usedPrompts, theme, null, isAdult);
       if (aiPrompts.length > 0 && !usedPrompts.has(aiPrompts[0])) {
         usedPrompts.add(aiPrompts[0]);
         return aiPrompts[0];
@@ -947,14 +864,6 @@ function getPromptsNeededForRound(playerCount, promptsPerPlayer = 2) {
  */
 function isAIAvailable() {
   return config.hasActiveApiKey();
-}
-
-/**
- * Check if adult mode is enabled (xAI only)
- * @returns {boolean}
- */
-function isAdultModeEnabled() {
-  return config.getAdultMode && config.getAdultMode() && config.getActiveProvider() === config.PROVIDERS.XAI;
 }
 
 /**
@@ -995,22 +904,17 @@ function generateFlashbackPrompt(usedPrompts = new Set(), theme = null) {
  * Generate a Flashback Lash prompt with AI (story completion)
  * @param {Set} usedPrompts - Set of already used prompt strings
  * @param {string|null} theme - Optional theme for themed generation
- * @param {boolean} isCrossover - Two-theme mashup
  * @returns {Promise<object>} { prompt: string, mode: 'FLASHBACK' }
  */
-async function generateFlashbackPromptAsync(usedPrompts = new Set(), theme = null, isCrossover = false) {
+async function generateFlashbackPromptAsync(usedPrompts = new Set(), theme = null) {
   if (getActiveClient() && theme) {
     try {
-      const crossoverLine = isCrossover
-        ? '\nHumorously combine BOTH worlds from this mashup theme in one setup. Keep it recognizable to casual fans.'
-        : '';
-      
       const prompt = (await callAI({
         system: 'You are a comedy writer creating Flashback Lash prompts for a party game. Create engaging story setups that end on a cliffhanger with "Then..." for players to complete. Be creative and tie into the given theme authentically.',
         userContent: `Generate ONE Flashback Lash prompt for the theme "${theme}". 
 This is a short story setup where players complete the final line.
 The story should end with "Then..." so players write what happens next.
-Make it specific to the "${theme}" universe - use characters, locations, or situations from it.${crossoverLine}
+Make it specific to the "${theme}" universe - use characters, locations, or situations from it.
 Keep it under 200 characters. Return ONLY the story setup, nothing else.
 
 Example format: "The [character] was [doing something] when [something unexpected happened]. Then..."`,
@@ -1108,21 +1012,17 @@ function generateRoastPrompt(usedPrompts = new Set(), theme = null, isAdult = fa
 
 /**
  * Themed Roast Lash via AI; falls back to local roast bank
- * @param {boolean} isCrossover - Mashup theme: combine both worlds
  */
-async function generateRoastPromptAsync(usedPrompts = new Set(), theme = null, isAdult = false, isCrossover = false) {
+async function generateRoastPromptAsync(usedPrompts = new Set(), theme = null, isAdult = false) {
   if (getActiveClient() && theme) {
     try {
-      const crossoverLine = isCrossover
-        ? '\nHumorously combine BOTH worlds from this mashup theme in one roast premise. Keep it recognizable to casual fans.'
-        : '';
       const systemRegular = 'You are a comedy writer for Roast Lash in a party game. Generate ONE prompt line that asks all players for a single funny roast, burn, or brutal one-liner (not a story). PG-13: edgy humor is OK; no slurs; do not instruct players to attack each other by name. Abstract or situational targets only.';
       const systemAdult = 'You write Roast Lash prompts for an uncensored adult party game. Generate ONE prompt line asking for a raunchy, edgy roast or burn tied to the theme—like Cards Against Humanity or Quiplash adult mode. Do not instruct targeting other players by name or seat. Return only the prompt line.';
       const prompt = (await callAI({
         system: isAdult ? systemAdult : systemRegular,
         userContent: `Generate ONE Roast Lash prompt for the theme "${theme}".
 The prompt must ask players for a single funny roast or brutal one-liner (not a story).
-Make it specific to the "${theme}" universe.${crossoverLine}
+Make it specific to the "${theme}" universe.
 Keep it under 200 characters. Return ONLY the prompt line, nothing else.`,
         maxTokens: 256
       })).trim();
@@ -1168,24 +1068,22 @@ function generateLastWitPrompt(usedPrompts = new Set(), theme = null, isAdult = 
  * @param {Set} usedPrompts - Set of already used prompts
  * @param {boolean} useAI - Whether to use AI generation
  * @param {string|null} theme - Optional theme
- * @param {boolean} isCrossover - Mashup theme for Flashback AI
  * @returns {Promise<object>} Mode-specific prompt object
  */
-async function generateLastWitPromptAsync(usedPrompts = new Set(), useAI = true, theme = null, isAdult = false, isCrossover = false) {
+async function generateLastWitPromptAsync(usedPrompts = new Set(), useAI = true, theme = null, isAdult = false) {
   const mode = selectRandomLastWitMode();
   
   switch (mode) {
     case LAST_WIT_MODES.FLASHBACK:
       if (useAI && getActiveClient()) {
-        return generateFlashbackPromptAsync(usedPrompts, theme, isCrossover);
+        return generateFlashbackPromptAsync(usedPrompts, theme);
       }
       return generateFlashbackPrompt(usedPrompts, theme);
     case LAST_WIT_MODES.WORD_LASH:
-      // Word Lash is just random letters, no AI needed
       return generateWordLashPrompt(usedPrompts, theme);
     case LAST_WIT_MODES.ROAST_LASH:
       if (useAI && getActiveClient()) {
-        return generateRoastPromptAsync(usedPrompts, theme, isAdult, isCrossover);
+        return generateRoastPromptAsync(usedPrompts, theme, isAdult);
       }
       return generateRoastPrompt(usedPrompts, theme, isAdult);
     default:
@@ -1236,11 +1134,8 @@ module.exports = {
   generateUniquePromptsAsync,
   generateLastLashPrompt,
   generateLastLashPromptAsync,
-  generatePromptsWithAI,
-  validatePrompt,
   getPromptsNeededForRound,
   isAIAvailable,
-  isAdultModeEnabled,
   reinitializeClient,
   promptData,
   parseThemes,
@@ -1256,6 +1151,5 @@ module.exports = {
   generateLastWitPrompt,
   generateLastWitPromptAsync,
   validateWordLashAnswer,
-  generateUniqueAdultPrompts,
-  generateLastLashAdultPrompt
+  generateUniqueAdultPrompts
 };
