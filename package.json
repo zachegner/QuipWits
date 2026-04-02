@@ -8,6 +8,7 @@
     "test": "jest",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
+    "test:grok": "jest tests/integration/xai-grok.test.js",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
     "test:script:normal": "node tests/scripts/normal-game.js",
@@ -17,6 +18,7 @@
     "test:script:tie": "node tests/scripts/tie-game.js",
     "test:script:decisive": "node tests/scripts/decisive-win-game.js",
     "test:script:multiplayer": "node tests/scripts/multiplayer-e2e.js",
+    "test:script:solo-bots": "node tests/scripts/solo-with-bots.js",
     "electron:dev": "electron .",
     "build": "electron-builder --config electron-builder.config.js -mwl",
     "build:mac": "electron-builder --config electron-builder.config.js --mac",
@@ -36,6 +38,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "openai": "^6.33.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
